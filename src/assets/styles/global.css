@@ -1,0 +1,18 @@
+/* 全局样式:底色与文字跟随双主题变量,移动端禁用双击缩放(任务书第 16 章) */
+
+html,
+body {
+  background-color: var(--lc-bg);
+  color: var(--lc-text-1);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+body {
+  /* 移动端禁用双击缩放 */
+  touch-action: manipulation;
+}
+
+#app {
+  height: 100%;
+}

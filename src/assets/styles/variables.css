@@ -1,0 +1,51 @@
+/* 设计变量:亮/暗双主题 CSS 变量(任务书 5.1,权威源详见 5.3 app store) */
+
+:root {
+  /* 亮色:亮蓝色调 */
+  --lc-primary: #3b82f6;
+  --lc-primary-hover: #60a5fa;
+  --lc-primary-pressed: #2563eb;
+  --lc-primary-soft: #eff6ff;
+  --lc-success: #18a058;
+  --lc-warning: #f0a020;
+  --lc-error: #d03050;
+  --lc-info: #3b82f6;
+
+  --lc-bg: #f8fafc;
+  --lc-bg-card: #ffffff;
+  --lc-bg-elevated: #ffffff;
+  --lc-bg-hover: #f1f5f9;
+  --lc-border: #e2e8f0;
+  --lc-text-1: #0f172a;
+  --lc-text-2: #475569;
+  --lc-text-3: #94a3b8;
+
+  --lc-radius: 10px;
+  --lc-radius-lg: 14px;
+  --lc-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --lc-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+html.dark {
+  /* 暗色:暗蓝色调 */
+  --lc-primary: #60a5fa;
+  --lc-primary-hover: #93c5fd;
+  --lc-primary-pressed: #3b82f6;
+  --lc-primary-soft: #1e293b;
+  --lc-success: #34d399;
+  --lc-warning: #fbbf24;
+  --lc-error: #f87171;
+  --lc-info: #60a5fa;
+
+  --lc-bg: #0b1120;
+  --lc-bg-card: #111827;
+  --lc-bg-elevated: #1e293b;
+  --lc-bg-hover: #1e293b;
+  --lc-border: #1e293b;
+  --lc-text-1: #f1f5f9;
+  --lc-text-2: #cbd5e1;
+  --lc-text-3: #64748b;
+
+  --lc-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --lc-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}

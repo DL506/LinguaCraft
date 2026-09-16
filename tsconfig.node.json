@@ -1,0 +1,11 @@
+{
+  // Node 侧 TS 配置:vite.config.ts 等构建期文件使用(提供 node: 模块类型)
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true
+  },
+  "include": ["vite.config.ts"]
+}
