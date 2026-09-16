@@ -25,7 +25,7 @@ module.exports = {
     'no-console': 'off',
     // any 降级为警告,不阻断构建
     '@typescript-eslint/no-explicit-any': 'warn',
-    // 未使用变量降级为警告,下划线开头参数豁免
-    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    // 未使用变量降级为警告,下划线开头参数豁免;解构剔字段的 rest 参数豁免
+    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
   },
 }

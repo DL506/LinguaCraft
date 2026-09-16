@@ -1,5 +1,10 @@
 // 应用入口:装配 Vue 应用、全局状态与路由
-// P1 阶段将在此追加 MSW 启动逻辑(任务书 13.1:VITE_USE_MOCK === 'true' 时顶层 await 启动 worker)
+// MSW 启动(任务书 13.1):仅开发环境启用;顶层 await 依赖 tsconfig target ES2022 支持
+if (import.meta.env.VITE_USE_MOCK === 'true') {
+  const { worker } = await import('@/mocks/browser')
+  await worker.start({ onUnhandledRequest: 'bypass' })
+}
+
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
