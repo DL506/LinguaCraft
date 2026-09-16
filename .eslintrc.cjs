@@ -27,5 +27,11 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'warn',
     // 未使用变量降级为警告,下划线开头参数豁免;解构剔字段的 rest 参数豁免
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
+    // 视图文件命名以任务书为准(如 Login.vue 单字名)
+    'vue/multi-word-component-names': 'off',
+    // 以下格式类规则交由 Prettier 负责,避免与代码风格冲突
+    'vue/max-attributes-per-line': 'off',
+    'vue/singleline-html-element-content-newline': 'off',
+    'vue/html-self-closing': 'off',
   },
 }
