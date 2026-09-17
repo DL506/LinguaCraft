@@ -5,7 +5,7 @@
       <AppLogo />
     </router-link>
     <n-dropdown :options="menuOptions" trigger="click" @select="onMenuSelect">
-      <n-avatar round size="small" class="mobile-top-bar__avatar">明</n-avatar>
+      <n-avatar round size="small" class="mobile-top-bar__avatar">{{ avatarText }}</n-avatar>
     </n-dropdown>
   </div>
 </template>
@@ -16,10 +16,15 @@ import { useRouter } from 'vue-router'
 import { NAvatar, NDropdown, type MenuOption } from 'naive-ui'
 import AppLogo from '@/components/common/AppLogo.vue'
 import { useAppStore } from '@/stores/app'
+import { useUserStore } from '@/stores/user'
 import { clearToken } from '@/utils/storage'
 
 const router = useRouter()
 const appStore = useAppStore()
+const userStore = useUserStore()
+
+/** 头像文字:昵称首字,未登录取演示昵称首字 */
+const avatarText = computed(() => (userStore.nickname ? userStore.nickname[0] : '明'))
 
 /** 手机顶部下拉:切换主题 + 常用入口(任务书 5.6) */
 const menuOptions = computed<MenuOption[]>(() => [
