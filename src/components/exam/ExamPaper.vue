@@ -20,26 +20,28 @@
 
     <!-- 答题区:按当前部分渲染 -->
     <div class="exam-paper__body">
-      <!-- 阅读部分:文章 + 单选(全局编号 1-15) -->
-      <template v-if="activeSection?.type === 'reading' && readingContent">
-        <div class="exam-paper__passage">
-          <PassageRenderer
-            :passage="readingContent.passage"
-            :font-size="16"
-            :eye-protect="false"
-            @favorite-sentence="onFavoriteSentence"
-          />
-        </div>
-        <div class="exam-paper__questions">
-          <QuestionItem
-            v-for="q in readingContent.questions"
-            :key="q.id"
-            :question="q"
-            :model-value="objective[q.id] ?? ''"
-            :graded="false"
-            @update:model-value="onPick(q.id, $event)"
-          />
-        </div>
+      <!-- 阅读部分:3 篇,每篇 5 题(题号全局连续 1-15),按篇渲染文章与题目 -->
+      <template v-if="readingPapers">
+        <template v-for="paperItem in readingPapers" :key="paperItem.id">
+          <div class="exam-paper__passage">
+            <PassageRenderer
+              :passage="paperItem.passage"
+              :font-size="16"
+              :eye-protect="false"
+              @favorite-sentence="onFavoriteSentence"
+            />
+          </div>
+          <div class="exam-paper__questions">
+            <QuestionItem
+              v-for="q in paperItem.questions"
+              :key="q.id"
+              :question="q"
+              :model-value="objective[q.id] ?? ''"
+              :graded="false"
+              @update:model-value="onPick(q.id, $event)"
+            />
+          </div>
+        </template>
       </template>
 
       <!-- 五选五部分:选项池 + 文章槽位(全局编号 16-20,文章占位保持局部编号展示) -->
@@ -207,9 +209,11 @@ const activeSection = computed(() => props.paper.sections.find((s) => s.part ===
 
 /** 各部分内容(按 part 定位;类型断言基于数据契约约定) */
 const sectionContent = computed(() => activeSection.value?.content)
-const readingContent = computed(() =>
-  activeSection.value?.type === 'reading' ? (sectionContent.value as ReadingQuestionForAnswer) : null
-)
+const readingPapers = computed(() => {
+  const section = activeSection.value
+  if (!section || section.type !== 'reading' || !Array.isArray(section.content)) return null
+  return section.content as ReadingQuestionForAnswer[]
+})
 const matchingContent = computed(() =>
   activeSection.value?.type === 'matching' ? (sectionContent.value as MatchingQuestionForAnswer) : null
 )
@@ -253,14 +257,18 @@ function partName(type: PracticeType): string {
   return map[type]
 }
 
-/** 某部分题量(作文不计数) */
+/** 某部分题量(作文不计数;阅读为 3 篇题数合计) */
 function countInPart(part: number): number {
   const section = props.paper.sections.find((s) => s.part === part)
   if (!section) return 0
-  if (section.type === 'reading' && section.content.type === 'reading') return section.content.questions.length
-  if (section.type === 'matching' && section.content.type === 'matching') return section.content.blanks.length
-  if (section.type === 'cloze' && section.content.type === 'cloze') return section.content.blanks.length
-  if (section.type === 'grammar-fill' && section.content.type === 'grammar-fill') return section.content.blanks.length
+  const content = section.content
+  if (section.type === 'reading' && Array.isArray(content)) {
+    return content.reduce((sum, p) => sum + p.questions.length, 0)
+  }
+  if (Array.isArray(content)) return 0
+  if (content.type === 'matching') return content.blanks.length
+  if (content.type === 'cloze') return content.blanks.length
+  if (content.type === 'grammar-fill') return content.blanks.length
   return 0
 }
 

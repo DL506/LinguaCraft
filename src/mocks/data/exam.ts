@@ -1,6 +1,7 @@
 // 真题模考 mock 演示数据(Full 版含答案;handler 下发前经 stripExamPaper 过滤)
 // 精简约定:仅保留 1 套演示卷,真实真题由后端契约另行提供
 // 结构按任务书 11.7:五个部分(阅读30分/五选五10分/完形30分/语法15分/作文15分)
+// 阅读部分契约调整:3 篇,每篇 5 题,题号全局连续 1-15(见 types/exam.d.ts)
 // 答题卡编号规则:全局编号=前序 section 题量累加+本节题序(阅读1-15,匹配16-20,完形21-35,语法36-45)
 import type { ExamPaperFull } from '@/types/exam'
 
@@ -16,195 +17,216 @@ export const examStore: ExamPaperFull[] = [
         part: 1,
         type: 'reading',
         score: 30,
-        content: {
-          id: 'exam-2026-reading',
-          type: 'reading',
-          source: { type: 'real', meta: { year: 2026, region: '广东' } },
-          passage:
-            'Many workers now choose "quiet quitting" — doing only the basic duties and refusing extra tasks. Supporters say it protects mental health and work-life balance. Critics warn that long-term quiet quitting may slow career growth and hurt team spirit. Experts suggest finding a middle way: set clear boundaries, but keep learning new skills.\n\nIn China, young employees also talk about "lying flat" (tangping). Some reduce overtime and stop chasing promotions after years of pressure. Companies have started to respond by offering mental health programs and more flexible hours. A recent survey found that employees with flexible schedules report higher satisfaction and are less likely to look for new jobs.\n\nThe debate continues, but one thing is clear: a healthy workplace needs respect for both personal time and professional goals. Employees who communicate their needs openly often avoid the extreme choices altogether.',
-          questions: [
-            {
-              id: 1,
-              stem: 'What does "quiet quitting" mean in the workplace?',
-              options: [
-                { key: 'A', text: 'Leaving a job secretly.' },
-                { key: 'B', text: 'Doing only basic duties.' },
-                { key: 'C', text: 'Refusing to speak at meetings.' },
-                { key: 'D', text: 'Working from home all week.' },
-              ],
-              answer: 'B',
-              explanation: '第一句破折号后对 quiet quitting 的解释是只做基本职责。',
-            },
-            {
-              id: 2,
-              stem: 'What do supporters of quiet quitting emphasize?',
-              options: [
-                { key: 'A', text: 'Higher salaries.' },
-                { key: 'B', text: 'Better teamwork.' },
-                { key: 'C', text: 'Mental health and balance.' },
-                { key: 'D', text: 'Faster promotion.' },
-              ],
-              answer: 'C',
-              explanation: '第二句指出支持者认为它保护心理健康与工作生活平衡。',
-            },
-            {
-              id: 3,
-              stem: 'What do critics warn about quiet quitting?',
-              options: [
-                { key: 'A', text: 'It may slow career growth.' },
-                { key: 'B', text: 'It increases salaries.' },
-                { key: 'C', text: 'It improves companies.' },
-                { key: 'D', text: 'It helps team spirit.' },
-              ],
-              answer: 'A',
-              explanation: '第三句批评者警告它可能减缓职业成长、伤害团队精神。',
-            },
-            {
-              id: 4,
-              stem: 'What is "tangping" according to the passage?',
-              options: [
-                { key: 'A', text: 'A type of online game.' },
-                { key: 'B', text: 'A fashion style among students.' },
-                { key: 'C', text: 'Another word for hardworking.' },
-                { key: 'D', text: 'A Chinese term for lying flat.' },
-              ],
-              answer: 'D',
-              explanation: '第二段开头括号里注明 tangping 即 lying flat。',
-            },
-            {
-              id: 5,
-              stem: 'How are some companies responding to the trend?',
-              options: [
-                { key: 'A', text: 'By cutting salaries.' },
-                { key: 'B', text: 'By offering mental health programs.' },
-                { key: 'C', text: 'By adding more work.' },
-                { key: 'D', text: 'By canceling holidays.' },
-              ],
-              answer: 'B',
-              explanation: '第二段末句说明企业通过心理健康项目和弹性工时回应。',
-            },
-            {
-              id: 6,
-              stem: 'What does the survey mentioned in the passage show?',
-              options: [
-                { key: 'A', text: 'Flexible workers are more satisfied.' },
-                { key: 'B', text: 'Flexible workers earn less.' },
-                { key: 'C', text: 'Most workers hate flexibility.' },
-                { key: 'D', text: 'Companies dislike surveys.' },
-              ],
-              answer: 'A',
-              explanation: '第二段最后说明弹性排班的员工满意度更高。',
-            },
-            {
-              id: 7,
-              stem: 'What do experts suggest workers do?',
-              options: [
-                { key: 'A', text: 'Refuse all extra tasks forever.' },
-                { key: 'B', text: 'Find a middle way.' },
-                { key: 'C', text: 'Work more overtime.' },
-                { key: 'D', text: 'Change jobs often.' },
-              ],
-              answer: 'B',
-              explanation: '第一段末句专家建议找到中间道路:设定边界但坚持学习。',
-            },
-            {
-              id: 8,
-              stem: 'How can employees avoid extreme choices?',
-              options: [
-                { key: 'A', text: 'By never talking to managers.' },
-                { key: 'B', text: 'By communicating needs openly.' },
-                { key: 'C', text: 'By hiding their feelings.' },
-                { key: 'D', text: 'By copying colleagues.' },
-              ],
-              answer: 'B',
-              explanation: '末段最后一句:开诚布公沟通需求的员工常能避免极端选择。',
-            },
-            {
-              id: 9,
-              stem: 'The phrase "set clear boundaries" is closest in meaning to ________.',
-              options: [
-                { key: 'A', text: 'make limits clear' },
-                { key: 'B', text: 'build taller walls' },
-                { key: 'C', text: 'draw bigger maps' },
-                { key: 'D', text: 'buy more land' },
-              ],
-              answer: 'A',
-              explanation: 'set clear boundaries 意为明确划定界限。',
-            },
-            {
-              id: 10,
-              stem: 'What does the passage say about a healthy workplace?',
-              options: [
-                { key: 'A', text: 'It only cares about profits.' },
-                { key: 'B', text: 'It needs respect for both sides.' },
-                { key: 'C', text: 'It has no rules at all.' },
-                { key: 'D', text: 'It forbids holidays.' },
-              ],
-              answer: 'B',
-              explanation: '末段开头:健康职场需要尊重个人时间与职业目标。',
-            },
-            {
-              id: 11,
-              stem: 'According to the passage, employees with flexible schedules ________.',
-              options: [
-                { key: 'A', text: 'refuse to work at all' },
-                { key: 'B', text: 'look for new jobs more often' },
-                { key: 'C', text: 'are less likely to change jobs' },
-                { key: 'D', text: 'always feel pressured' },
-              ],
-              answer: 'C',
-              explanation: '第二段末句:弹性排班员工更不易跳槽。',
-            },
-            {
-              id: 12,
-              stem: 'Why do some young people stop chasing promotions?',
-              options: [
-                { key: 'A', text: 'They love overtime work.' },
-                { key: 'B', text: 'They feel pressure from years of work.' },
-                { key: 'C', text: 'They dislike money.' },
-                { key: 'D', text: 'They want to retire young.' },
-              ],
-              answer: 'B',
-              explanation: '第二段第二句:多年压力后一些人减少加班、不再追求晋升。',
-            },
-            {
-              id: 13,
-              stem: 'Which statement best describes the author’s attitude?',
-              options: [
-                { key: 'A', text: 'Strongly against quiet quitting.' },
-                { key: 'B', text: 'Balanced and open-minded.' },
-                { key: 'C', text: 'Completely silent on the topic.' },
-                { key: 'D', text: 'Encourages quitting all jobs.' },
-              ],
-              answer: 'B',
-              explanation: '全文呈现正反观点并给出中间路线,态度平衡开放。',
-            },
-            {
-              id: 14,
-              stem: 'The word "respond" in paragraph 2 means ________.',
-              options: [
-                { key: 'A', text: 'to react' },
-                { key: 'B', text: 'to forget' },
-                { key: 'C', text: 'to ignore' },
-                { key: 'D', text: 'to punish' },
-              ],
-              answer: 'A',
-              explanation: 'companies have started to respond 意为企业开始回应。',
-            },
-            {
-              id: 15,
-              stem: 'What is the best title for this passage?',
-              options: [
-                { key: 'A', text: 'How to Quit a Job Quietly' },
-                { key: 'B', text: 'Balance in the Modern Workplace' },
-                { key: 'C', text: 'The History of Overtime' },
-                { key: 'D', text: 'Salary Secrets of Managers' },
-              ],
-              answer: 'B',
-              explanation: '全文围绕职场中的工作与生活平衡展开,故选 B。',
-            },
-          ],
-        },
+        // 阅读部分:3 篇,每篇 5 题,题号全局连续 1-15
+        content: [
+          {
+            id: 'exam-2026-reading-1',
+            type: 'reading',
+            source: { type: 'real', meta: { year: 2026, region: '广东' } },
+            passage:
+              'Many workers now choose "quiet quitting" — doing only the basic duties and refusing extra tasks. Supporters say it protects mental health and work-life balance. Critics warn that long-term quiet quitting may slow career growth and hurt team spirit. Experts suggest finding a middle way: set clear boundaries, but keep learning new skills.\n\nIn China, young employees also talk about "lying flat" (tangping). Some reduce overtime and stop chasing promotions after years of pressure. Companies have started to respond by offering mental health programs and more flexible hours. A recent survey found that employees with flexible schedules report higher satisfaction and are less likely to look for new jobs.\n\nThe debate continues, but one thing is clear: a healthy workplace needs respect for both personal time and professional goals. Employees who communicate their needs openly often avoid the extreme choices altogether.',
+            questions: [
+              {
+                id: 1,
+                stem: 'What does "quiet quitting" mean in the workplace?',
+                options: [
+                  { key: 'A', text: 'Leaving a job secretly.' },
+                  { key: 'B', text: 'Doing only basic duties.' },
+                  { key: 'C', text: 'Refusing to speak at meetings.' },
+                  { key: 'D', text: 'Working from home all week.' },
+                ],
+                answer: 'B',
+                explanation: '第一句破折号后对 quiet quitting 的解释是只做基本职责。',
+              },
+              {
+                id: 2,
+                stem: 'What do supporters of quiet quitting emphasize?',
+                options: [
+                  { key: 'A', text: 'Higher salaries.' },
+                  { key: 'B', text: 'Better teamwork.' },
+                  { key: 'C', text: 'Mental health and balance.' },
+                  { key: 'D', text: 'Faster promotion.' },
+                ],
+                answer: 'C',
+                explanation: '第二句指出支持者认为它保护心理健康与工作生活平衡。',
+              },
+              {
+                id: 3,
+                stem: 'What do critics warn about quiet quitting?',
+                options: [
+                  { key: 'A', text: 'It may slow career growth.' },
+                  { key: 'B', text: 'It increases salaries.' },
+                  { key: 'C', text: 'It improves companies.' },
+                  { key: 'D', text: 'It helps team spirit.' },
+                ],
+                answer: 'A',
+                explanation: '第三句批评者警告它可能减缓职业成长、伤害团队精神。',
+              },
+              {
+                id: 4,
+                stem: 'What is "tangping" according to the passage?',
+                options: [
+                  { key: 'A', text: 'A type of online game.' },
+                  { key: 'B', text: 'A fashion style among students.' },
+                  { key: 'C', text: 'Another word for hardworking.' },
+                  { key: 'D', text: 'A Chinese term for lying flat.' },
+                ],
+                answer: 'D',
+                explanation: '第二段开头括号里注明 tangping 即 lying flat。',
+              },
+              {
+                id: 5,
+                stem: 'How are some companies responding to the trend?',
+                options: [
+                  { key: 'A', text: 'By cutting salaries.' },
+                  { key: 'B', text: 'By offering mental health programs.' },
+                  { key: 'C', text: 'By adding more work.' },
+                  { key: 'D', text: 'By canceling holidays.' },
+                ],
+                answer: 'B',
+                explanation: '第二段末句说明企业通过心理健康项目和弹性工时回应。',
+              },
+            ],
+          },
+          {
+            id: 'exam-2026-reading-2',
+            type: 'reading',
+            source: { type: 'real', meta: { year: 2026, region: '广东' } },
+            passage:
+              'Working part-time has become common among college students in China. Some take jobs to cover daily costs, while others hope to gain experience before graduation. A survey at a Guangdong university this spring found that students who worked ten hours a week or less improved their time management without hurting their grades. However, experts warn that working too much can lead to stress and poor sleep. The key, they say, is to set a clear limit and always put study first.',
+            questions: [
+              {
+                id: 6,
+                stem: 'What has become common among college students?',
+                options: [
+                  { key: 'A', text: 'Working part-time.' },
+                  { key: 'B', text: 'Studying abroad.' },
+                  { key: 'C', text: 'Changing majors.' },
+                  { key: 'D', text: 'Skipping breakfast.' },
+                ],
+                answer: 'A',
+                explanation: '第一句指出大学生兼职越来越普遍。',
+              },
+              {
+                id: 7,
+                stem: 'Why do some students take part-time jobs?',
+                options: [
+                  { key: 'A', text: 'To cover costs or gain experience.' },
+                  { key: 'B', text: 'To avoid exams.' },
+                  { key: 'C', text: 'To meet famous people.' },
+                  { key: 'D', text: 'To skip classes.' },
+                ],
+                answer: 'A',
+                explanation: '第二句说明兼职目的:补贴开销与积累经验。',
+              },
+              {
+                id: 8,
+                stem: 'What did the survey find about students working ten hours a week or less?',
+                options: [
+                  { key: 'A', text: 'They improved time management.' },
+                  { key: 'B', text: 'They dropped out of school.' },
+                  { key: 'C', text: 'They failed all exams.' },
+                  { key: 'D', text: 'They slept much more.' },
+                ],
+                answer: 'A',
+                explanation: '第三句:每周不超过十小时的学生时间管理变好且成绩不受影响。',
+              },
+              {
+                id: 9,
+                stem: 'What may working too much cause?',
+                options: [
+                  { key: 'A', text: 'Stress and poor sleep.' },
+                  { key: 'B', text: 'More savings.' },
+                  { key: 'C', text: 'Better grades.' },
+                  { key: 'D', text: 'Stronger friendship.' },
+                ],
+                answer: 'A',
+                explanation: '第四句:过度工作会带来压力与睡眠问题。',
+              },
+              {
+                id: 10,
+                stem: 'What is the key according to experts?',
+                options: [
+                  { key: 'A', text: 'Setting a clear limit.' },
+                  { key: 'B', text: 'Working as much as possible.' },
+                  { key: 'C', text: 'Quitting all jobs.' },
+                  { key: 'D', text: 'Copying friends.' },
+                ],
+                answer: 'A',
+                explanation: '末句:关键是设定明确上限,学业优先。',
+              },
+            ],
+          },
+          {
+            id: 'exam-2026-reading-3',
+            type: 'reading',
+            source: { type: 'real', meta: { year: 2026, region: '广东' } },
+            passage:
+              'Last term, the university library began staying open until midnight during exam weeks. The change came after many students asked for quiet places to study at night. Since then, late-night seats have been almost fully booked. The library also added more power outlets and a coffee corner for late stayers. A librarian said the aim is not just longer hours, but a comfortable space where students want to stay.',
+            questions: [
+              {
+                id: 11,
+                stem: 'When does the library stay open until midnight?',
+                options: [
+                  { key: 'A', text: 'During exam weeks.' },
+                  { key: 'B', text: 'All year round.' },
+                  { key: 'C', text: 'Only on weekends.' },
+                  { key: 'D', text: 'On public holidays.' },
+                ],
+                answer: 'A',
+                explanation: '第一句:考试周期间图书馆开放至午夜。',
+              },
+              {
+                id: 12,
+                stem: 'Why did the library make the change?',
+                options: [
+                  { key: 'A', text: 'Students asked for quiet study places.' },
+                  { key: 'B', text: 'Teachers demanded it.' },
+                  { key: 'C', text: 'Nobody visited in the daytime.' },
+                  { key: 'D', text: 'A donation required it.' },
+                ],
+                answer: 'A',
+                explanation: '第二句:许多学生希望有夜间安静的学习场所。',
+              },
+              {
+                id: 13,
+                stem: 'What happened after the change?',
+                options: [
+                  { key: 'A', text: 'Late-night seats are almost fully booked.' },
+                  { key: 'B', text: 'Fewer students came.' },
+                  { key: 'C', text: 'The library became empty.' },
+                  { key: 'D', text: 'All the books were sold.' },
+                ],
+                answer: 'A',
+                explanation: '第三句:夜间座位几乎被约满。',
+              },
+              {
+                id: 14,
+                stem: 'What else did the library add?',
+                options: [
+                  { key: 'A', text: 'Power outlets and a coffee corner.' },
+                  { key: 'B', text: 'A swimming pool.' },
+                  { key: 'C', text: 'More parking spaces.' },
+                  { key: 'D', text: 'A small cinema.' },
+                ],
+                answer: 'A',
+                explanation: '第四句:图书馆增设了插座与咖啡角。',
+              },
+              {
+                id: 15,
+                stem: 'What is the librarian’s aim?',
+                options: [
+                  { key: 'A', text: 'A comfortable space students want to stay in.' },
+                  { key: 'B', text: 'Longer hours only.' },
+                  { key: 'C', text: 'Higher fees.' },
+                  { key: 'D', text: 'Fewer rules.' },
+                ],
+                answer: 'A',
+                explanation: '末句:目标不只是延长时长,而是让学生愿意待的舒适空间。',
+              },
+            ],
+          },
+        ],
       },
       {
         part: 2,

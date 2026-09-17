@@ -93,10 +93,13 @@ export function stripExamPaper(paper: ExamPaperFull): ExamPaper {
   }
 }
 
-/** 整卷单 section 内容过滤(内部工具) */
+/** 整卷单 section 内容过滤(内部工具;阅读部分契约调整后为 3 篇数组,逐篇剥离) */
 function stripSectionContent(type: PracticeType, content: ExamSectionContentFull) {
+  if (Array.isArray(content)) {
+    return content.map((p) => stripReadingAnswer(p))
+  }
   const mapper = {
-    reading: stripReadingAnswer,
+    reading: (c: never) => c, // 占位:阅读已在数组分支处理(异常数据原样返回)
     matching: stripMatchingAnswer,
     cloze: stripClozeAnswer,
     'grammar-fill': stripGrammarFillAnswer,

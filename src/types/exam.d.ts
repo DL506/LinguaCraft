@@ -1,4 +1,4 @@
-// 真题模考域类型:整卷结构、提交与成绩报告(任务书 11.7、12.4)
+// 真题模考域类型:整卷结构、提交与成绩报告(任务书 11.7、12.4;阅读部分契约调整见下)
 import type {
   ClozeQuestionForAnswer,
   ClozeQuestionFull,
@@ -12,6 +12,12 @@ import type {
   WritingQuestionForAnswer,
   WritingQuestionFull,
 } from './practice'
+
+/** 阅读部分内容(契约调整):整卷阅读为 3 篇,每篇 5 题,题号全局连续 1-15 */
+export type ReadingPaperContent = ReadingQuestionForAnswer[]
+
+/** 阅读部分完整内容(仅 mock 层存储) */
+export type ReadingPaperContentFull = ReadingQuestionFull[]
 
 /** 整卷结构(下发版:content 为不含答案的下发类型) */
 export interface ExamPaper {
@@ -35,7 +41,7 @@ export interface ExamSection {
   /** 该部分卷面分值 */
   score: number
   content:
-    | ReadingQuestionForAnswer
+    | ReadingPaperContent
     | MatchingQuestionForAnswer
     | ClozeQuestionForAnswer
     | GrammarFillQuestionForAnswer
@@ -44,7 +50,7 @@ export interface ExamSection {
 
 /** 完整类型联合(仅 mock 层存储,含答案) */
 export type ExamSectionContentFull =
-  | ReadingQuestionFull
+  | ReadingPaperContentFull
   | MatchingQuestionFull
   | ClozeQuestionFull
   | GrammarFillQuestionFull

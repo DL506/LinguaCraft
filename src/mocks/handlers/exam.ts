@@ -65,18 +65,20 @@ function gradeExamObjective(
 
   for (const section of exam.sections) {
     let partScore = 0
-    if (section.type === 'reading' && section.content.type === 'reading') {
-      const per = 2 // 15 题 30 分
-      for (const q of section.content.questions) {
-        const userAnswer = objective[q.id] ?? ''
-        const isCorrect = userAnswer === q.answer
-        if (isCorrect) {
-          correctCount++
-          partScore += per
+    if (section.type === 'reading' && Array.isArray(section.content)) {
+      const per = 2 // 15 题 30 分(3 篇,每篇 5 题,题号全局连续 1-15)
+      for (const paper of section.content) {
+        for (const q of paper.questions) {
+          const userAnswer = objective[q.id] ?? ''
+          const isCorrect = userAnswer === q.answer
+          if (isCorrect) {
+            correctCount++
+            partScore += per
+          }
+          details.push({ id: q.id, userAnswer, correctAnswer: q.answer, isCorrect, explanation: q.explanation })
         }
-        details.push({ id: q.id, userAnswer, correctAnswer: q.answer, isCorrect, explanation: q.explanation })
       }
-    } else if (section.type === 'matching' && section.content.type === 'matching') {
+    } else if (section.type === 'matching' && !Array.isArray(section.content) && section.content.type === 'matching') {
       const per = 2 // 5 题 10 分
       for (const b of section.content.blanks) {
         const globalId = 15 + b.id // 匹配段起始 16
@@ -88,7 +90,7 @@ function gradeExamObjective(
         }
         details.push({ id: globalId, userAnswer, correctAnswer: b.answer, isCorrect, explanation: b.explanation })
       }
-    } else if (section.type === 'cloze' && section.content.type === 'cloze') {
+    } else if (section.type === 'cloze' && !Array.isArray(section.content) && section.content.type === 'cloze') {
       const per = 2 // 15 题 30 分
       for (const b of section.content.blanks) {
         const globalId = 20 + b.id // 完形段起始 21
@@ -100,7 +102,7 @@ function gradeExamObjective(
         }
         details.push({ id: globalId, userAnswer, correctAnswer: b.answer, isCorrect, explanation: b.explanation })
       }
-    } else if (section.type === 'grammar-fill' && section.content.type === 'grammar-fill') {
+    } else if (section.type === 'grammar-fill' && !Array.isArray(section.content) && section.content.type === 'grammar-fill') {
       const per = 1.5 // 10 题 15 分
       for (const b of section.content.blanks) {
         const globalId = 35 + b.id // 语法填空段起始 36
