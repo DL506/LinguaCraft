@@ -16,13 +16,11 @@
       <!-- 列表态 -->
       <div v-if="state === 'source' || state === 'list'" class="matching-page__list">
         <PracticeSourceBar
-          :source="source"
           :filter-chips="filterChips"
           :selected="filterSelected"
-          @update:source="onSourceChange"
           @update:selected="filterSelected = $event"
         />
-        <PracticeListPage :list="list" @start="onStart" @review="onReview" />
+        <PracticeListPage :list="displayList" @start="onStart" @review="onReview" />
       </div>
 
       <!-- AI 生成态 -->
@@ -152,6 +150,13 @@ function chipOf(item: PracticeListItem): string {
   if (item.source.type === 'teacher') return item.source.meta.teacherName ?? item.title
   return item.source.meta.year ? String(item.source.meta.year) : item.title
 }
+
+/** 按当前筛选 chip 过滤列表('全部' 不过滤) */
+const displayList = computed(() =>
+  filterSelected.value === '全部'
+    ? list.value
+    : list.value.filter((i) => chipOf(i) === filterSelected.value)
+)
 
 function detailOf(id: number): SubmitDetail | undefined {
   if (state.value !== 'review') return undefined
@@ -357,33 +362,29 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* 页面自然流式布局:不占用 100vh、不做内部滚动,由布局层内容区统一滚动 */
 .matching-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background-color: var(--lc-bg);
+  gap: 12px;
 }
 
 .matching-page__main {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
+  min-width: 0;
 }
 
 .matching-page__list {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 860px;
-  margin: 0 auto;
+  min-width: 0;
 }
 
 .matching-page__answer {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 1200px;
-  margin: 0 auto;
+  min-width: 0;
 }
 
 .answer {

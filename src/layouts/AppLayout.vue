@@ -38,13 +38,15 @@
           <!-- 手机:二级横向 Tab -->
           <MobileSubTabs v-if="isMobile && !isImmersive" />
 
-          <!-- 主内容区 -->
-          <n-layout-content :content-style="contentStyle" :native-scrollbar="false">
-            <router-view v-slot="{ Component }">
-              <transition name="fade" mode="out-in">
-                <component :is="Component" />
-              </transition>
-            </router-view>
+          <!-- 主内容区:自管容器承载 padding/居中,内容自然撑高,由本区域统一滚动 -->
+          <n-layout-content :native-scrollbar="false">
+            <div class="app-content" :style="contentStyle">
+              <router-view v-slot="{ Component }">
+                <transition name="fade" mode="out-in">
+                  <component :is="Component" />
+                </transition>
+              </router-view>
+            </div>
           </n-layout-content>
 
           <!-- 手机:底部一级 Tab(沉浸模式隐藏,任务书 6.2) -->
@@ -86,6 +88,7 @@ const contentStyle = computed(() => {
     paddingBottom: isMobile.value ? mobileBottom : '24px',
     maxWidth: isDesktop.value ? '1200px' : '100%',
     margin: '0 auto',
+    boxSizing: 'border-box' as const,
   }
 })
 </script>
