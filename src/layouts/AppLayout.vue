@@ -14,7 +14,7 @@
 
           <!-- ⚠️ 新增:包裹侧边栏和内容区的水平布局容器 -->
           <n-layout has-sider style="height: calc(100% - 56px);"> 
-          <!-- 桌面:左侧二级导航常驻 200px,可折叠 -->
+            <!-- 桌面:左侧二级导航常驻 200px,可折叠 -->
             <n-layout-sider
               v-if="isDesktop && !isImmersive"
               bordered
