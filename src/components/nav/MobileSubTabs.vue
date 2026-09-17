@@ -39,6 +39,12 @@ function onMenuSelect(key: string): void {
   background-color: var(--lc-bg-card);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /* 隐藏系统滚动条样式,保留横滑能力 */
+  scrollbar-width: none;
+}
+
+.mobile-sub-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .mobile-sub-tabs :deep(.n-menu) {

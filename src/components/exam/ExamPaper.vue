@@ -401,8 +401,9 @@ defineExpose({ getPayload, unansweredCount })
   background-color: var(--lc-bg-card);
   line-height: 2.2;
   color: var(--lc-text-1);
+  /* 断词兜底 + 横向兜底(clip 不创建滚动容器) */
   overflow-wrap: break-word;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .exam-paper__questions {

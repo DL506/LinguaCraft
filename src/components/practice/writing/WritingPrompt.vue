@@ -36,8 +36,9 @@ defineProps<{
   padding: 16px;
   border-radius: var(--lc-radius-lg);
   background-color: var(--lc-bg-card);
+  /* 断词兜底 + 横向兜底(clip 不创建滚动容器) */
   overflow-wrap: break-word;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .writing-prompt__title {

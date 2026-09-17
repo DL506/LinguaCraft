@@ -401,11 +401,9 @@ onMounted(async () => {
   background-color: var(--lc-bg-card);
   line-height: 2.2;
   color: var(--lc-text-1);
-  /* 断词兜底 + 横向兜底,防溢出 */
+  /* 断词兜底 + 横向兜底(clip 不创建滚动容器);纵向滚动交给布局内容区 */
   overflow-wrap: break-word;
-  overflow-x: hidden;
-  max-height: 60vh;
-  overflow-y: auto;
+  overflow-x: clip;
 }
 
 .answer__result {

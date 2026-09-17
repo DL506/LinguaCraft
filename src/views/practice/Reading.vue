@@ -450,9 +450,8 @@ onMounted(async () => {
   padding: 16px;
   border-radius: var(--lc-radius-lg);
   background-color: var(--lc-bg-card);
-  overflow-x: hidden;
-  overflow-y: auto;
-  max-height: 66vh;
+  /* 防横向溢出且不创建滚动容器(clip 不强制另一轴为 auto);纵向滚动交给布局内容区 */
+  overflow-x: clip;
 }
 
 .answer__questions {

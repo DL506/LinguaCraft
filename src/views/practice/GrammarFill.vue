@@ -377,9 +377,9 @@ onMounted(async () => {
   padding: 16px;
   border-radius: var(--lc-radius-lg);
   background-color: var(--lc-bg-card);
-  /* 断词兜底 + 横向兜底,防溢出 */
+  /* 断词兜底 + 横向兜底(clip 不创建滚动容器),防溢出 */
   overflow-wrap: break-word;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* 桌面:填空列表两列;手机单列 */

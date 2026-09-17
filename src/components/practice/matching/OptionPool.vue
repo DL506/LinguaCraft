@@ -34,9 +34,14 @@ defineEmits<{ pick: [key: string] }>()
   padding: 12px;
   border-radius: var(--lc-radius-lg);
   background-color: var(--lc-bg-card);
-  /* 手机:横向可滚动(10.8);桌面也允许滚动兜底 */
+  /* 手机:横向可滚动(10.8);桌面也允许滚动兜底;隐藏系统滚动条样式 */
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.option-pool::-webkit-scrollbar {
+  display: none;
 }
 
 .option-pool :deep(.option-card) {

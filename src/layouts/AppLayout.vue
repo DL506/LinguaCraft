@@ -96,9 +96,11 @@ const contentStyle = computed(() => {
 </script>
 
 <style scoped>
-/* 布局容器:绝对定位铺满视口,滚动交给 n-layout-content */
+/* 布局容器:绝对定位铺满视口,滚动交给 n-layout-content;
+   overflow hidden 裁切意外溢出,防窗口级双滚动条 */
 .n-layout {
   height: 100vh;
+  overflow: hidden;
 }
 
 .mobile-tabbar {

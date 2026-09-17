@@ -11,8 +11,37 @@ body {
 body {
   /* 移动端禁用双击缩放 */
   touch-action: manipulation;
+  /* SPA 全屏布局:禁止窗口级滚动(滚动统一由布局内容区承担,防双滚动条) */
+  overflow: hidden;
 }
 
 #app {
   height: 100%;
+  overflow: hidden;
+}
+
+/* 统一细滚动条(全局):所有原生滚动容器不再显示系统默认样式
+   注:naive-ui 自定义滚动条选择器优先级更高,不受本规则影响 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.45);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.7);
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
