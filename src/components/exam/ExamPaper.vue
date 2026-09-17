@@ -20,9 +20,9 @@
 
     <!-- 答题区:按当前部分渲染 -->
     <div class="exam-paper__body">
-      <!-- 阅读部分:3 篇,每篇 5 题(题号全局连续 1-15),按篇渲染文章与题目 -->
+      <!-- 阅读部分:3 篇,每篇 5 题(题号全局连续 1-15);布局与 practice/reading 一致——桌面左文章右题目 -->
       <template v-if="readingPapers">
-        <template v-for="paperItem in readingPapers" :key="paperItem.id">
+        <div v-for="paperItem in readingPapers" :key="paperItem.id" class="exam-paper__reading-paper">
           <div class="exam-paper__passage">
             <PassageRenderer
               :passage="paperItem.passage"
@@ -41,7 +41,7 @@
               @update:model-value="onPick(q.id, $event)"
             />
           </div>
-        </template>
+        </div>
       </template>
 
       <!-- 五选五部分:选项池 + 文章槽位(全局编号 16-20,文章占位保持局部编号展示) -->
@@ -393,6 +393,20 @@ defineExpose({ getPayload, unansweredCount })
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+}
+
+/* 阅读部分:与 practice/reading 布局一致——桌面左文章右题目;≤1023px 上下单列 */
+.exam-paper__reading-paper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .exam-paper__reading-paper {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .exam-paper__passage {
