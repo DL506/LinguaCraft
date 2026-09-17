@@ -1,27 +1,51 @@
-// 沉浸模式(任务书 6.5):所有答题页进入沉浸,隐藏导航,只留练习头部
-// 增强(检查修复):练习页头部提供"显示/隐藏导航"切换;用户切出后为会话级延续(内存态,刷新重置)
-import { computed, ref, watchEffect } from 'vue'
+// 沉浸模式(按用户调整:答题页进入后不再默认沉浸,由用户在答题头部手动开启/退出)
+// 状态为模块级单例:布局层只读消费(isImmersive),头部按钮调用 toggle 切换;
+// body 类名同步由模块级 effect 统一完成;组件卸载自动复位,防止离开页面后导航仍被隐藏
+// meta.immersive 语义调整:仅用于标记"支持沉浸"的答题页(决定头部是否显示切换按钮),不再自动生效
+import { computed, onUnmounted, ref, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 
-/** 用户是否主动切出了沉浸(模块级共享状态:AppLayout 与练习页头部同步响应) */
-const userExitedImmersive = ref(false)
+/** 沉浸是否开启(全局单例状态,默认关闭) */
+const immersiveActive = ref(false)
+
+/** body 类名同步(模块级单次注册,供全局样式钩子使用) */
+watchEffect(() => {
+  document.body.classList.toggle('immersive', immersiveActive.value)
+})
 
 export function useImmersive() {
   const route = useRoute()
-  /** 路由是否为沉浸型页面(meta.immersive,如五种题型页与模考) */
-  const isImmersivePage = computed(() => !!route.meta.immersive)
-  /** 最终沉浸态:沉浸型页面 且 用户未主动切出 */
-  const isImmersive = computed(() => isImmersivePage.value && !userExitedImmersive.value)
 
-  // body class 同步:多组件各自建立 watchEffect,写入同一 class,幂等安全
-  watchEffect(() => {
-    document.body.classList.toggle('immersive', isImmersive.value)
+  /** 当前路由是否支持沉浸的答题页(meta.immersive → 显示头部切换按钮) */
+  const isImmersivePage = computed(() => !!route.meta.immersive)
+
+  // 组件卸载时自动退出沉浸(离开答题页即恢复导航)
+  onUnmounted(() => {
+    immersiveActive.value = false
   })
 
-  /** 切换导航显隐:会话级延续,直到用户切回或刷新页面 */
-  function toggleImmersive(): void {
-    userExitedImmersive.value = !userExitedImmersive.value
+  /** 开启沉浸:隐藏导航,只留练习头部 */
+  function enableImmersive(): void {
+    immersiveActive.value = true
   }
 
-  return { isImmersive, isImmersivePage, userExitedImmersive, toggleImmersive }
+  /** 退出沉浸:恢复导航 */
+  function disableImmersive(): void {
+    immersiveActive.value = false
+  }
+
+  /** 切换沉浸(答题头部按钮) */
+  function toggleImmersive(): void {
+    immersiveActive.value = !immersiveActive.value
+  }
+
+  return {
+    /** 当前是否处于沉浸(默认 false,需手动开启) */
+    isImmersive: computed(() => immersiveActive.value),
+    /** 当前页是否支持沉浸(按钮显隐依据) */
+    isImmersivePage,
+    enableImmersive,
+    disableImmersive,
+    toggleImmersive,
+  }
 }

@@ -9,7 +9,7 @@ declare module 'vue-router' {
     title?: string
     /** 所属一级导航:home/practice/learn/user(任务书 6.3 高亮规则) */
     section?: string
-    /** 是否沉浸模式(任务书 6.5) */
+    /** 是否支持沉浸模式(答题页标记:头部显示手动开启按钮,不再默认沉浸,见 useImmersive) */
     immersive?: boolean
     /** 是否公开页(免登录,守卫放行) */
     public?: boolean

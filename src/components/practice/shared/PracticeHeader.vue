@@ -11,12 +11,12 @@
     <SourceSwitcher :model-value="source" @update:model-value="$emit('update:source', $event)" />
 
     <div class="practice-header__right">
-      <!-- 沉浸切换(会话级延续):显示/隐藏导航,默认沉浸(验收 5 不变) -->
+      <!-- 沉浸切换(手动开启,默认不沉浸):隐藏/恢复导航 -->
       <n-button
         v-if="isImmersivePage"
         quaternary
         circle
-        :title="isImmersive ? '显示导航' : '隐藏导航(沉浸)'"
+        :title="isImmersive ? '退出沉浸' : '进入沉浸'"
         @click="toggleImmersive"
       >
         <template #icon>
@@ -58,7 +58,7 @@ defineEmits<{
   submit: []
 }>()
 
-// 沉浸切换:头部按钮控制导航显隐(会话级延续,实现见 useImmersive)
+// 沉浸切换:头部按钮手动开启/退出(默认不进入沉浸,实现见 useImmersive)
 const { isImmersive, isImmersivePage, toggleImmersive } = useImmersive()
 </script>
 
