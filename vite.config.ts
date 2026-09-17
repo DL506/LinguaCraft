@@ -4,10 +4,13 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
+import VueDevTools from 'vite-plugin-vue-devtools'
 
 export default defineConfig({
   plugins: [
     vue(),
+    // Vue DevTools 调试插件:仅在开发服务器(dev)中注入悬浮调试面板,生产构建不引入,不影响打包产物
+    VueDevTools(),
     // PWA 插件:与 MSW 的 Service Worker 互斥(任务书 13.1)。
     // devOptions.enabled 保持默认 false → 开发环境只有 MSW 生效;
     // VITE_USE_MOCK 仅存在于 .env.development,生产构建中它的值为 undefined,MSW 注册代码自动跳过,由 PWA SW 工作。
