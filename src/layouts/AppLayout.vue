@@ -12,43 +12,45 @@
             <TopNav :is-tablet="isTablet" />
           </n-layout-header>
 
+          <!-- ⚠️ 新增:包裹侧边栏和内容区的水平布局容器 -->
+          <n-layout has-sider style="height: calc(100% - 56px);"> 
           <!-- 桌面:左侧二级导航常驻 200px,可折叠 -->
-          <n-layout-sider
-            v-if="isDesktop && !isImmersive"
-            bordered
-            collapse-mode="width"
-            :width="200"
-            :collapsed-width="64"
-            :collapsed="appStore.siderCollapsed"
-            show-trigger
-            @collapse="appStore.siderCollapsed = true"
-            @expand="appStore.siderCollapsed = false"
-          >
-            <SideNav :collapsed="appStore.siderCollapsed" />
-          </n-layout-sider>
+            <n-layout-sider
+              v-if="isDesktop && !isImmersive"
+              bordered
+              collapse-mode="width"
+              :width="200"
+              :collapsed-width="64"
+              :collapsed="appStore.siderCollapsed"
+              show-trigger
+              @collapse="appStore.siderCollapsed = true"
+              @expand="appStore.siderCollapsed = false"
+            >
+              <SideNav :collapsed="appStore.siderCollapsed" />
+            </n-layout-sider>
+          
+            <!-- 平板:左侧抽屉二级导航 -->
+            <NavDrawer v-if="isTablet" />
 
-          <!-- 平板:左侧抽屉二级导航 -->
-          <NavDrawer v-if="isTablet" />
+            <!-- 手机:顶部栏 -->
+            <n-layout-header v-if="isMobile && !isImmersive" bordered style="height: 48px">
+              <MobileTopBar />
+            </n-layout-header>
 
-          <!-- 手机:顶部栏 -->
-          <n-layout-header v-if="isMobile && !isImmersive" bordered style="height: 48px">
-            <MobileTopBar />
-          </n-layout-header>
+            <!-- 手机:二级横向 Tab -->
+            <MobileSubTabs v-if="isMobile && !isImmersive" />
 
-          <!-- 手机:二级横向 Tab -->
-          <MobileSubTabs v-if="isMobile && !isImmersive" />
-
-          <!-- 主内容区:自管容器承载 padding/居中,内容自然撑高,由本区域统一滚动 -->
-          <n-layout-content :native-scrollbar="false">
-            <div class="app-content" :style="contentStyle">
-              <router-view v-slot="{ Component }">
-                <transition name="fade" mode="out-in">
-                  <component :is="Component" />
-                </transition>
-              </router-view>
-            </div>
-          </n-layout-content>
-
+            <!-- 主内容区:自管容器承载 padding/居中,内容自然撑高,由本区域统一滚动 -->
+            <n-layout-content :native-scrollbar="false">
+              <div class="app-content" :style="contentStyle">
+                <router-view v-slot="{ Component }">
+                  <transition name="fade" mode="out-in">
+                    <component :is="Component" />
+                  </transition>
+                </router-view>
+              </div>
+            </n-layout-content>
+          </n-layout>
           <!-- 手机:底部一级 Tab(沉浸模式隐藏,任务书 6.2) -->
           <n-layout-footer v-if="isMobile && !isImmersive" class="mobile-tabbar">
             <MobileTabBar />
