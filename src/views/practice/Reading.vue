@@ -418,7 +418,8 @@ onMounted(async () => {
 
 .answer {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr):1fr 等价 minmax(auto, 1fr),列宽会被长内容撑爆导致横向溢出,需显式允许收缩 */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   min-height: 0;
 }
@@ -432,6 +433,7 @@ onMounted(async () => {
 .answer__passage {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 320px;
 }
 
@@ -446,6 +448,7 @@ onMounted(async () => {
   padding: 16px;
   border-radius: var(--lc-radius-lg);
   background-color: var(--lc-bg-card);
+  overflow-x: hidden;
   overflow-y: auto;
   max-height: 66vh;
 }

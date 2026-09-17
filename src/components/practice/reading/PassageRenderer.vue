@@ -9,7 +9,7 @@
     @mouseup="onMouseUp"
   >
     <template v-for="(word, index) in words" :key="index">
-      <span class="passage-renderer__word" @click="onWordClick(word, $event)">{{ word }}</span><span> </span>
+      <span class="passage-renderer__word" @click="onWordClick(word, $event)">{{ word }}</span>{{ ' ' }}
     </template>
 
     <!-- 桌面点词查词浮动卡 -->
@@ -149,6 +149,8 @@ function onFavClick(): void {
   position: relative;
   line-height: 2;
   color: var(--lc-text-1);
+  /* 断词兜底:超长单词/无空格文本强制断行,防止横向溢出 */
+  overflow-wrap: break-word;
 }
 
 .passage-renderer.is-eye-protect {
