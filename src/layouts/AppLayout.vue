@@ -75,13 +75,19 @@ const appStore = useAppStore()
 const { isMobile, isTablet, isDesktop } = useDevice()
 const { isImmersive } = useImmersive()
 
-/** 主内容区样式(任务书 6.4):手机 16px / 其他 24px,桌面 1200px 居中 */
-const contentStyle = computed(() => ({
-  padding: isMobile.value ? '16px' : '24px',
-  paddingBottom: isMobile.value ? 'calc(56px + env(safe-area-inset-bottom) + 16px)' : '24px',
-  maxWidth: isDesktop.value ? '1200px' : '100%',
-  margin: '0 auto',
-}))
+/** 主内容区样式(任务书 6.4):手机 16px / 其他 24px,桌面 1200px 居中
+    手机沉浸态无底部 Tab,不再预留 56px 底部空间 */
+const contentStyle = computed(() => {
+  const mobileBottom = isImmersive.value
+    ? '16px'
+    : 'calc(56px + env(safe-area-inset-bottom) + 16px)'
+  return {
+    padding: isMobile.value ? '16px' : '24px',
+    paddingBottom: isMobile.value ? mobileBottom : '24px',
+    maxWidth: isDesktop.value ? '1200px' : '100%',
+    margin: '0 auto',
+  }
+})
 </script>
 
 <style scoped>

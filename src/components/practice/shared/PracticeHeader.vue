@@ -11,6 +11,18 @@
     <SourceSwitcher :model-value="source" @update:model-value="$emit('update:source', $event)" />
 
     <div class="practice-header__right">
+      <!-- 沉浸切换(会话级延续):显示/隐藏导航,默认沉浸(验收 5 不变) -->
+      <n-button
+        v-if="isImmersivePage"
+        quaternary
+        circle
+        :title="isImmersive ? '显示导航' : '隐藏导航(沉浸)'"
+        @click="toggleImmersive"
+      >
+        <template #icon>
+          <n-icon :component="isImmersive ? ExpandOutline : ContractOutline" />
+        </template>
+      </n-button>
       <CountdownTimer v-if="answering" :seconds="elapsed" />
       <n-button v-if="answering" type="primary" size="small" :loading="submitting" @click="$emit('submit')">
         提交
@@ -20,10 +32,11 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowBackOutline } from '@vicons/ionicons5'
+import { ArrowBackOutline, ContractOutline, ExpandOutline } from '@vicons/ionicons5'
 import { NButton, NIcon } from 'naive-ui'
 import SourceSwitcher from '@/components/common/SourceSwitcher.vue'
 import CountdownTimer from '@/components/common/CountdownTimer.vue'
+import { useImmersive } from '@/composables/useImmersive'
 import type { SourceType } from '@/types/practice'
 
 defineProps<{
@@ -44,6 +57,9 @@ defineEmits<{
   'update:source': [value: SourceType]
   submit: []
 }>()
+
+// 沉浸切换:头部按钮控制导航显隐(会话级延续,实现见 useImmersive)
+const { isImmersive, isImmersivePage, toggleImmersive } = useImmersive()
 </script>
 
 <style scoped>
