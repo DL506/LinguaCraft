@@ -44,62 +44,64 @@
       <n-pagination :page="page" :page-size="PAGE_SIZE" :item-count="total" @update:page="onPageChange" />
     </div>
 
-    <!-- 详情抽屉 -->
+    <!-- 详情抽屉:n-drawer-content 提供标题栏与右上角关闭按钮(手机全屏抽屉的唯一退出口) -->
     <n-drawer v-model:show="detailShow" :width="isMobile ? '100%' : 480" placement="right">
-      <div v-if="detail" class="detail">
-        <div class="detail__head">
-          <n-tag :type="statusType(detail.status)" :bordered="false">{{ statusLabel(detail.status) }}</n-tag>
-          <span v-if="detail.score !== undefined" class="detail__score">
-            {{ detail.score }}/{{ detail.totalScore }} 分
-          </span>
-          <n-tag v-if="detail.gradingMethod" size="small" :bordered="false" type="info">
-            {{ gradingLabel(detail.gradingMethod) }}
-          </n-tag>
-        </div>
+      <n-drawer-content title="提交详情" closable :native-scrollbar="false">
+        <div v-if="detail" class="detail">
+          <div class="detail__head">
+            <n-tag :type="statusType(detail.status)" :bordered="false">{{ statusLabel(detail.status) }}</n-tag>
+            <span v-if="detail.score !== undefined" class="detail__score">
+              {{ detail.score }}/{{ detail.totalScore }} 分
+            </span>
+            <n-tag v-if="detail.gradingMethod" size="small" :bordered="false" type="info">
+              {{ gradingLabel(detail.gradingMethod) }}
+            </n-tag>
+          </div>
 
-        <p v-if="detail.status === 'pending'" class="detail__pending">
-          {{ detail.estimatedTime ?? '预计 24 小时内出结果' }},请稍后再来查看。
-        </p>
-
-        <!-- 逐题明细(批改后下发) -->
-        <table v-if="detail.details?.length" class="detail__table">
-          <thead>
-            <tr><th>题号</th><th>你的答案</th><th>正确答案</th><th>结果</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in detail.details" :key="row.id">
-              <td>{{ row.id }}</td>
-              <td>{{ row.userAnswer || '未作答' }}</td>
-              <td>{{ row.correctAnswer }}</td>
-              <td>{{ row.isCorrect ? '✅' : '❌' }}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- 写作评分维度 / 范文 / 总评 -->
-        <div v-if="detail.dimensions?.length" class="detail__block">
-          <p class="detail__block-title">评分维度</p>
-          <p v-for="dim in detail.dimensions" :key="dim.name" class="detail__dimension">
-            {{ dim.name }}:{{ dim.score }}({{ dim.comment }})
+          <p v-if="detail.status === 'pending'" class="detail__pending">
+            {{ detail.estimatedTime ?? '预计 24 小时内出结果' }},请稍后再来查看。
           </p>
-        </div>
-        <div v-if="detail.sampleAnswer" class="detail__block">
-          <p class="detail__block-title">范文</p>
-          <p class="detail__pre">{{ detail.sampleAnswer }}</p>
-        </div>
-        <div v-if="detail.overallComment" class="detail__block">
-          <p class="detail__block-title">总评</p>
-          <p>{{ detail.overallComment }}</p>
-        </div>
 
-        <!-- 错题解析(批改后) -->
-        <div v-if="detail.details?.some((d) => !d.isCorrect)" class="detail__block">
-          <p class="detail__block-title">错题解析</p>
-          <p v-for="row in detail.details?.filter((d) => !d.isCorrect)" :key="row.id" class="detail__explanation">
-            {{ row.id }}.{{ row.explanation }}
-          </p>
+          <!-- 逐题明细(批改后下发) -->
+          <table v-if="detail.details?.length" class="detail__table">
+            <thead>
+              <tr><th>题号</th><th>你的答案</th><th>正确答案</th><th>结果</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in detail.details" :key="row.id">
+                <td>{{ row.id }}</td>
+                <td>{{ row.userAnswer || '未作答' }}</td>
+                <td>{{ row.correctAnswer }}</td>
+                <td>{{ row.isCorrect ? '✅' : '❌' }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- 写作评分维度 / 范文 / 总评 -->
+          <div v-if="detail.dimensions?.length" class="detail__block">
+            <p class="detail__block-title">评分维度</p>
+            <p v-for="dim in detail.dimensions" :key="dim.name" class="detail__dimension">
+              {{ dim.name }}:{{ dim.score }}({{ dim.comment }})
+            </p>
+          </div>
+          <div v-if="detail.sampleAnswer" class="detail__block">
+            <p class="detail__block-title">范文</p>
+            <p class="detail__pre">{{ detail.sampleAnswer }}</p>
+          </div>
+          <div v-if="detail.overallComment" class="detail__block">
+            <p class="detail__block-title">总评</p>
+            <p>{{ detail.overallComment }}</p>
+          </div>
+
+          <!-- 错题解析(批改后) -->
+          <div v-if="detail.details?.some((d) => !d.isCorrect)" class="detail__block">
+            <p class="detail__block-title">错题解析</p>
+            <p v-for="row in detail.details?.filter((d) => !d.isCorrect)" :key="row.id" class="detail__explanation">
+              {{ row.id }}.{{ row.explanation }}
+            </p>
+          </div>
         </div>
-      </div>
+      </n-drawer-content>
     </n-drawer>
   </div>
 </template>
@@ -108,7 +110,7 @@
 // 数据:GET /user/submissions(状态筛选+分页)与 GET /user/submissions/:id(详情)
 import { computed, h, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NDataTable, NDrawer, NPagination, NTag, type DataTableColumns } from 'naive-ui'
+import { NButton, NDataTable, NDrawer, NDrawerContent, NPagination, NTag, type DataTableColumns } from 'naive-ui'
 import { getSubmissionDetail, getSubmissions } from '@/api/user'
 import { useDevice } from '@/composables/useDevice'
 import { formatDateTime } from '@/utils/format'
@@ -297,11 +299,11 @@ onMounted(() => {
 }
 
 /* 详情抽屉 */
+/* 内边距由 n-drawer-content 的 body 提供,避免双重间距 */
 .detail {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px;
   overflow-wrap: break-word;
 }
 
