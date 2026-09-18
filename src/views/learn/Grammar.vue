@@ -50,9 +50,8 @@
 
     <!-- 手机:底部固定操作条(上一节/下一节,10.14) -->
     <div v-if="isMobile" class="grammar-page__mobile-bar">
-      <n-button block :disabled="store.currentIndex <= 0" @click="store.selectPrev()">上一节</n-button>
+      <n-button :disabled="store.currentIndex <= 0" @click="store.selectPrev()">上一节</n-button>
       <n-button
-        block
         type="primary"
         :disabled="store.currentIndex >= store.leaves.length - 1"
         @click="store.selectNext()"
@@ -168,5 +167,10 @@ onMounted(() => {
   border-radius: var(--lc-radius-lg);
   background-color: var(--lc-bg-card);
   box-shadow: var(--lc-shadow-sm);
+}
+
+/* 让两个按钮平分剩余空间，宽度绝对一致 */
+.grammar-page__mobile-bar .n-button {
+  flex: 1;
 }
 </style>
