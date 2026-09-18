@@ -292,7 +292,7 @@ function onPickerPick(key: string): void {
   activeOptionKey.value = null
 }
 
-/** 移除已填(点空格或 ✕) */
+/** 移除已填(点空格或移除标记) */
 function onBlankRemove(blankId: number): void {
   const next = { ...answers.value }
   delete next[blankId]

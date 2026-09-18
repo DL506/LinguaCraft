@@ -1,4 +1,4 @@
-<!-- 完形文章(任务书 10.9):全文 + 空位槽;空位显示编号/已选选项;批改态绿 ✅ / 红 ❌ -->
+<!-- 完形文章(任务书 10.9):全文 + 空位槽;空位显示编号/已选选项;批改态绿勾 / 红叉 -->
 <template>
   <div class="cloze-passage">
     <template v-for="(seg, index) in segments" :key="index">
@@ -11,7 +11,11 @@
         @click="onBlankClick(seg.id ?? 0)"
       >
         <template v-if="graded && detailOf(seg.id ?? 0)">
-          <span class="cloze-blank__mark">{{ detailOf(seg.id ?? 0)?.isCorrect ? '✅' : '' }}</span>
+          <n-icon
+            class="cloze-blank__mark"
+            :class="detailOf(seg.id ?? 0)?.isCorrect ? 'is-correct' : 'is-wrong'"
+            :component="detailOf(seg.id ?? 0)?.isCorrect ? CheckmarkCircle : CloseCircle"
+          />
           <span>[[{{ seg.id }}]] {{ detailOf(seg.id ?? 0)?.userAnswer || '未作答' }}</span>
           <span v-if="!detailOf(seg.id ?? 0)?.isCorrect" class="cloze-blank__correct">
             正确:{{ detailOf(seg.id ?? 0)?.correctAnswer }}
@@ -26,6 +30,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { NIcon } from 'naive-ui'
+import { CheckmarkCircle, CloseCircle } from '@vicons/ionicons5'
 import { usePlaceholder } from '@/composables/usePlaceholder'
 import type { SubmitDetail } from '@/types/practice'
 
@@ -119,7 +125,15 @@ function onBlankClick(id: number): void {
 }
 
 .cloze-blank__mark {
-  font-size: 12px;
+  font-size: 14px;
+}
+
+.cloze-blank__mark.is-correct {
+  color: var(--lc-success);
+}
+
+.cloze-blank__mark.is-wrong {
+  color: var(--lc-error);
 }
 
 .cloze-blank__correct {

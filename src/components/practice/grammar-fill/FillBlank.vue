@@ -20,8 +20,14 @@
     <!-- 批改态:对错 + 正确答案 + 可展开解析(10.10) -->
     <div v-if="graded && detail" class="fill-question__detail">
       <p>
-        <template v-if="detail.isCorrect">✅ 回答正确</template>
-        <template v-else>❌ 你的答案:{{ detail.userAnswer || '未作答' }} · 正确答案:{{ detail.correctAnswer }}</template>
+        <template v-if="detail.isCorrect">
+          <n-icon class="fill-question__mark is-correct" :component="CheckmarkCircle" />
+          回答正确
+        </template>
+        <template v-else>
+          <n-icon class="fill-question__mark is-wrong" :component="CloseCircle" />
+          你的答案:{{ detail.userAnswer || '未作答' }} · 正确答案:{{ detail.correctAnswer }}
+        </template>
       </p>
       <n-collapse>
         <n-collapse-item title="查看解析" name="explanation">
@@ -34,7 +40,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { NCollapse, NCollapseItem, NInput } from 'naive-ui'
+import { NCollapse, NCollapseItem, NIcon, NInput } from 'naive-ui'
+import { CheckmarkCircle, CloseCircle } from '@vicons/ionicons5'
 import type { SubmitDetail } from '@/types/practice'
 
 const props = defineProps<{
@@ -107,5 +114,20 @@ const inputStatus = computed(() => {
   margin-top: 8px;
   font-size: 13px;
   color: var(--lc-text-2);
+}
+
+/* 批改对错图标(取状态变量,亮暗双主题一致) */
+.fill-question__mark {
+  font-size: 14px;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+.fill-question__mark.is-correct {
+  color: var(--lc-success);
+}
+
+.fill-question__mark.is-wrong {
+  color: var(--lc-error);
 }
 </style>

@@ -90,7 +90,7 @@ export const grammarSections: GrammarSection[] = [
     id: 'noun-clause-object',
     title: '宾语从句与表语从句',
     markdown:
-      '## 考点精讲\n\n宾语从句三要素:**连接词、语序(陈述语序)、时态呼应**。表语从句位于系动词后,结构与宾语从句相同。\n\n## 真题示例\n\n`I wonder ___ he will come tomorrow.` → 答案 **whether**\n\n## 易错点辨析\n\n从句必须用陈述语序:when will he go ✗ → when he will go ✓。\n\n## 专项练习\n\n1. Can you tell me ___ the museum opens?\n2. The problem is ___ we can finish on time.',
+      '## 考点精讲\n\n宾语从句三要素:**连接词、语序(陈述语序)、时态呼应**。表语从句位于系动词后,结构与宾语从句相同。\n\n## 真题示例\n\n`I wonder ___ he will come tomorrow.` → 答案 **whether**\n\n## 易错点辨析\n\n从句必须用陈述语序:when will he go(误)→ when he will go(正)。\n\n## 专项练习\n\n1. Can you tell me ___ the museum opens?\n2. The problem is ___ we can finish on time.',
   },
   {
     id: 'non-finite-ing',

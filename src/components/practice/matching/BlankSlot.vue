@@ -1,8 +1,12 @@
-<!-- 五选五空格槽位(任务书 10.8):默认虚线;选中主色;已填实线+可移除;批改态绿 ✅ / 红 ❌ -->
+<!-- 五选五空格槽位(任务书 10.8):默认虚线;选中主色;已填实线+可移除;批改态绿勾 / 红叉 -->
 <template>
   <span class="blank-slot" :class="slotClass" role="button" @click="onClick">
     <template v-if="graded && detail">
-      <span class="blank-slot__mark">{{ detail.isCorrect ? '✅' : '❌' }}</span>
+      <n-icon
+        class="blank-slot__mark"
+        :class="detail.isCorrect ? 'is-correct' : 'is-wrong'"
+        :component="detail.isCorrect ? CheckmarkCircle : CloseCircle"
+      />
       <span class="blank-slot__text">[[{{ id }}]] {{ detail.userAnswer || '未作答' }}</span>
       <span v-if="!detail.isCorrect" class="blank-slot__correct">正确:{{ detail.correctAnswer }}</span>
     </template>
@@ -18,6 +22,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { NIcon } from 'naive-ui'
+import { CheckmarkCircle, CloseCircle } from '@vicons/ionicons5'
 import type { SubmitDetail } from '@/types/practice'
 
 const props = defineProps<{
@@ -109,7 +115,15 @@ function onClick(): void {
 }
 
 .blank-slot__mark {
-  font-size: 12px;
+  font-size: 14px;
+}
+
+.blank-slot__mark.is-correct {
+  color: var(--lc-success);
+}
+
+.blank-slot__mark.is-wrong {
+  color: var(--lc-error);
 }
 
 .blank-slot__correct {

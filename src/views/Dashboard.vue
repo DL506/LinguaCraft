@@ -38,7 +38,7 @@
         <ul class="tasks">
           <li v-for="item in todayTasks" :key="item.type" class="tasks__item">
             <span class="tasks__icon" :class="{ 'is-done': item.done >= item.target }">
-              {{ item.done >= item.target ? '✅' : '⬜' }}
+              <n-icon :component="item.done >= item.target ? CheckmarkCircle : EllipseOutline" />
             </span>
             <span class="tasks__label">{{ taskLabel(item.type) }}</span>
             <span class="tasks__progress">{{ item.done }}/{{ item.target }}</span>
@@ -86,7 +86,7 @@
 // 数据来源:/home/today-tasks + /home/exam-countdown + /user/stats + /user/profile(昵称)
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { TimeOutline } from '@vicons/ionicons5'
+import { CheckmarkCircle, EllipseOutline, TimeOutline } from '@vicons/ionicons5'
 import { NButton, NCard, NIcon, NProgress } from 'naive-ui'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import { getExamCountdown, getTodayTasks, smartPractice } from '@/api/home'
@@ -324,6 +324,17 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 任务完成状态图标(完成绿勾 / 未完成灰圈) */
+.tasks__icon {
+  display: inline-flex;
+  font-size: 16px;
+  color: var(--lc-text-3);
+}
+
+.tasks__icon.is-done {
+  color: var(--lc-success);
 }
 
 .tasks__label {

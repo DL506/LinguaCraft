@@ -19,8 +19,14 @@
     <!-- 批改态详情:对错标记 + 用户答案 + 正确答案 + 解析(答案仅批改后下发) -->
     <div v-if="graded && detail" class="question-item__detail">
       <p>
-        <template v-if="detail.isCorrect">✅ 回答正确</template>
-        <template v-else>❌ 你的答案:{{ detail.userAnswer || '未作答' }} · 正确答案:{{ detail.correctAnswer }}</template>
+        <template v-if="detail.isCorrect">
+          <n-icon class="question-item__mark is-correct" :component="CheckmarkCircle" />
+          回答正确
+        </template>
+        <template v-else>
+          <n-icon class="question-item__mark is-wrong" :component="CloseCircle" />
+          你的答案:{{ detail.userAnswer || '未作答' }} · 正确答案:{{ detail.correctAnswer }}
+        </template>
       </p>
       <p class="question-item__explanation">解析:{{ detail.explanation }}</p>
     </div>
@@ -28,7 +34,8 @@
 </template>
 
 <script setup lang="ts">
-import { NRadio, NRadioGroup } from 'naive-ui'
+import { NIcon, NRadio, NRadioGroup } from 'naive-ui'
+import { CheckmarkCircle, CloseCircle } from '@vicons/ionicons5'
 import type { ReadingQuestionForAnswer } from '@/types/practice'
 import type { SubmitDetail } from '@/types/practice'
 
@@ -94,6 +101,21 @@ function optionClass(key: string): string {
 .question-item__key {
   font-weight: 600;
   margin-right: 4px;
+}
+
+/* 批改对错图标(取状态变量,亮暗双主题一致) */
+.question-item__mark {
+  font-size: 14px;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+.question-item__mark.is-correct {
+  color: var(--lc-success);
+}
+
+.question-item__mark.is-wrong {
+  color: var(--lc-error);
 }
 
 .question-item__detail {

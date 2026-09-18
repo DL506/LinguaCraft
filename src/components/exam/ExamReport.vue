@@ -40,7 +40,9 @@
     <!-- 薄弱项 -->
     <n-card :bordered="false" title="薄弱项">
       <ul class="weak-points">
-        <li v-for="(point, index) in report.weakPoints" :key="index">⚠️ {{ point }}</li>
+        <li v-for="(point, index) in report.weakPoints" :key="index">
+          <n-icon class="weak-points__icon" :component="Warning" /> {{ point }}
+        </li>
       </ul>
     </n-card>
 
@@ -64,7 +66,8 @@
 </template>
 
 <script setup lang="ts">
-import { NCard, NProgress, NTag } from 'naive-ui'
+import { NCard, NIcon, NProgress, NTag } from 'naive-ui'
+import { Warning } from '@vicons/ionicons5'
 import type { ExamReport } from '@/types/exam'
 import type { PracticeType } from '@/types/practice'
 
@@ -164,6 +167,14 @@ function partName(type: PracticeType): string {
   font-size: 13px;
   color: var(--lc-text-2);
   overflow-wrap: break-word;
+}
+
+/* 薄弱项警示图标(主题警告色,亮暗自适应) */
+.weak-points__icon {
+  font-size: 14px;
+  vertical-align: -2px;
+  margin-right: 2px;
+  color: var(--lc-warning);
 }
 
 .history {

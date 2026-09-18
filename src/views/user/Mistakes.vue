@@ -42,7 +42,10 @@
         <p class="mistake-card__title">{{ typeLabel(item.type) }} · {{ sourceLabel(item) }}</p>
         <p class="mistake-card__stem">{{ item.stem }}</p>
         <p class="mistake-card__answers">
-          你的答案:{{ item.userAnswer || '未作答' }} ❌ 正确答案:{{ item.correctAnswer }} ✅
+          你的答案:{{ item.userAnswer || '未作答' }}
+          <n-icon class="is-wrong" :component="CloseCircle" />
+          正确答案:{{ item.correctAnswer }}
+          <n-icon class="is-correct" :component="CheckmarkCircle" />
         </p>
         <div class="mistake-card__actions">
           <n-button size="small" @click="openExplanation(item)">查看解析</n-button>
@@ -74,7 +77,8 @@
 // 重做:跳题型页并带 query(任务书第 4 章重做链)
 import { computed, h, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NDataTable, NModal, NPagination, useDialog } from 'naive-ui'
+import { NButton, NDataTable, NIcon, NModal, NPagination, useDialog } from 'naive-ui'
+import { CheckmarkCircle, CloseCircle } from '@vicons/ionicons5'
 import { deleteMistake, getMistakes } from '@/api/user'
 import { useDevice } from '@/composables/useDevice'
 import type { PracticeType } from '@/types/practice'
@@ -265,6 +269,20 @@ onMounted(fetchList)
   color: var(--lc-text-2);
   margin-bottom: 10px;
   overflow-wrap: break-word;
+}
+
+/* 对错图标(取状态变量,亮暗双主题一致) */
+.mistake-card__answers .n-icon {
+  font-size: 14px;
+  vertical-align: -2px;
+}
+
+.mistake-card__answers .n-icon.is-correct {
+  color: var(--lc-success);
+}
+
+.mistake-card__answers .n-icon.is-wrong {
+  color: var(--lc-error);
 }
 
 .mistake-card__actions {

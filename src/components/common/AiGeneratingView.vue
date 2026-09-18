@@ -1,7 +1,7 @@
 <!-- AI 出题生成视图(任务书 10.6):点即生成,loading 后直接答题,无参数面板;失败给重试 -->
 <template>
   <div class="ai-generating">
-    <div class="ai-generating__icon">🤖</div>
+    <n-icon class="ai-generating__icon" :component="Bot24Regular" :size="48" />
     <h2 class="ai-generating__title">{{ failed ? '生成失败' : 'AI 正在为你出题...' }}</h2>
     <p v-if="!failed" class="ai-generating__sub">大约需要 10~20 秒</p>
     <div class="ai-generating__actions">
@@ -12,7 +12,9 @@
 </template>
 
 <script setup lang="ts">
-import { NButton } from 'naive-ui'
+import { NButton, NIcon } from 'naive-ui'
+// ionicons5 无机器人图标,机器人语义场景选用 Fluent 图标库
+import { Bot24Regular } from '@vicons/fluent'
 
 defineProps<{ failed?: boolean }>()
 defineEmits<{ retry: []; cancel: [] }>()
@@ -29,7 +31,8 @@ defineEmits<{ retry: []; cancel: [] }>()
 }
 
 .ai-generating__icon {
-  font-size: 48px;
+  /* AI 出题机器人标识(主题主色,亮暗自适应) */
+  color: var(--lc-primary);
 }
 
 .ai-generating__title {

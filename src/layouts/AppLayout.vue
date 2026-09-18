@@ -12,7 +12,7 @@
             <TopNav :is-tablet="isTablet" />
           </n-layout-header>
 
-          <!-- ⚠️ 新增:包裹侧边栏和内容区的水平布局容器 -->
+          <!-- 包裹侧边栏和内容区的水平布局容器 -->
           <!-- <n-layout has-sider style="height: calc(100% - 56px);">  -->
           <n-layout :has-sider="isDesktop && !isImmersive" style="height: calc(100% - 56px);">
             <!-- 桌面:左侧二级导航常驻 200px,可折叠 -->

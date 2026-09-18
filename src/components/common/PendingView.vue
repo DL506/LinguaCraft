@@ -1,7 +1,7 @@
 <!-- 待批改占位页(任务书 10.6):已提交,等待批改中;[返回列表] [刷新状态] -->
 <template>
   <div class="pending-view">
-    <div class="pending-view__icon">📤</div>
+    <n-icon class="pending-view__icon" :component="PaperPlane" :size="48" />
     <h2 class="pending-view__title">已提交,等待批改中</h2>
     <p class="pending-view__sub">{{ estimatedTime || '预计 24 小时内出结果' }}</p>
     <div class="pending-view__actions">
@@ -12,7 +12,8 @@
 </template>
 
 <script setup lang="ts">
-import { NButton } from 'naive-ui'
+import { NButton, NIcon } from 'naive-ui'
+import { PaperPlane } from '@vicons/ionicons5'
 
 defineProps<{ estimatedTime?: string; refreshing?: boolean }>()
 defineEmits<{ back: []; refresh: [] }>()
@@ -29,7 +30,8 @@ defineEmits<{ back: []; refresh: [] }>()
 }
 
 .pending-view__icon {
-  font-size: 48px;
+  /* 已提交待批改:纸飞机标识(主题主色,亮暗自适应) */
+  color: var(--lc-primary);
 }
 
 .pending-view__title {

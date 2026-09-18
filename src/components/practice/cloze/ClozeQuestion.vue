@@ -18,8 +18,14 @@
 
     <div v-if="graded && detail" class="cloze-question__detail">
       <p>
-        <template v-if="detail.isCorrect">✅ 回答正确</template>
-        <template v-else>❌ 你的答案:{{ detail.userAnswer || '未作答' }} · 正确答案:{{ detail.correctAnswer }}</template>
+        <template v-if="detail.isCorrect">
+          <n-icon class="cloze-question__mark is-correct" :component="CheckmarkCircle" />
+          回答正确
+        </template>
+        <template v-else>
+          <n-icon class="cloze-question__mark is-wrong" :component="CloseCircle" />
+          你的答案:{{ detail.userAnswer || '未作答' }} · 正确答案:{{ detail.correctAnswer }}
+        </template>
       </p>
       <p class="cloze-question__explanation">解析:{{ detail.explanation }}</p>
     </div>
@@ -27,7 +33,8 @@
 </template>
 
 <script setup lang="ts">
-import { NRadio, NRadioGroup } from 'naive-ui'
+import { NIcon, NRadio, NRadioGroup } from 'naive-ui'
+import { CheckmarkCircle, CloseCircle } from '@vicons/ionicons5'
 import type { ClozeQuestionForAnswer, SubmitDetail } from '@/types/practice'
 
 const props = defineProps<{
@@ -101,6 +108,21 @@ function optionClass(key: string): string {
 .cloze-question__key {
   font-weight: 600;
   margin-right: 4px;
+}
+
+/* 批改对错图标(取状态变量,亮暗双主题一致) */
+.cloze-question__mark {
+  font-size: 14px;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+.cloze-question__mark.is-correct {
+  color: var(--lc-success);
+}
+
+.cloze-question__mark.is-wrong {
+  color: var(--lc-error);
 }
 
 .cloze-question__detail {

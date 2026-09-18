@@ -50,7 +50,8 @@
             <div class="answer__toolbar">
               <n-button size="tiny" quaternary @click="fontSize = nextFontSize(fontSize)">Aa 字号</n-button>
               <n-button size="tiny" quaternary :type="eyeProtect ? 'primary' : 'default'" @click="eyeProtect = !eyeProtect">
-                🌙 护眼
+                <n-icon class="answer__eye-icon" :component="MoonOutline" />
+                护眼
               </n-button>
             </div>
             <div class="answer__passage-scroll">
@@ -125,7 +126,8 @@
 // 进入链:错题重做(route.query.id)→ 智能练习(store incomingItem)→ 常规来源列表
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NAlert, NButton, NTabPane, NTabs, useMessage } from 'naive-ui'
+import { NAlert, NButton, NIcon, NTabPane, NTabs, useMessage } from 'naive-ui'
+import { MoonOutline } from '@vicons/ionicons5'
 import PracticeHeader from '@/components/practice/shared/PracticeHeader.vue'
 import PracticeSourceBar from '@/components/practice/shared/PracticeSourceBar.vue'
 import PracticeListPage from '@/components/practice/shared/PracticeListPage.vue'
@@ -443,6 +445,12 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   margin-bottom: 8px;
+}
+
+/* 护眼按钮月亮图标(随按钮文字颜色,亮暗自适应) */
+.answer__eye-icon {
+  vertical-align: -2px;
+  margin-right: 4px;
 }
 
 .answer__passage-scroll {

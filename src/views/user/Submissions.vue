@@ -72,7 +72,13 @@
                 <td>{{ row.id }}</td>
                 <td>{{ row.userAnswer || '未作答' }}</td>
                 <td>{{ row.correctAnswer }}</td>
-                <td>{{ row.isCorrect ? '✅' : '❌' }}</td>
+                <td>
+                  <n-icon
+                    class="detail__result"
+                    :class="row.isCorrect ? 'is-correct' : 'is-wrong'"
+                    :component="row.isCorrect ? CheckmarkCircle : CloseCircle"
+                  />
+                </td>
               </tr>
             </tbody>
           </table>
@@ -110,7 +116,8 @@
 // 数据:GET /user/submissions(状态筛选+分页)与 GET /user/submissions/:id(详情)
 import { computed, h, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NDataTable, NDrawer, NDrawerContent, NPagination, NTag, type DataTableColumns } from 'naive-ui'
+import { NButton, NDataTable, NDrawer, NDrawerContent, NIcon, NPagination, NTag, type DataTableColumns } from 'naive-ui'
+import { CheckmarkCircle, CloseCircle } from '@vicons/ionicons5'
 import { getSubmissionDetail, getSubmissions } from '@/api/user'
 import { useDevice } from '@/composables/useDevice'
 import { formatDateTime } from '@/utils/format'
@@ -337,6 +344,19 @@ onMounted(() => {
   border-bottom: 1px solid var(--lc-border);
   text-align: left;
   color: var(--lc-text-2);
+}
+
+/* 批改结果图标(取状态变量,亮暗双主题一致) */
+.detail__result {
+  font-size: 14px;
+}
+
+.detail__result.is-correct {
+  color: var(--lc-success);
+}
+
+.detail__result.is-wrong {
+  color: var(--lc-error);
 }
 
 .detail__table th {
