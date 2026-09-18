@@ -13,9 +13,9 @@ export interface QuestionSource {
     year?: number
     /** 地区(真题) */
     region?: string
-    /** 老师姓名(老师出题) */
+    /** 老师姓名(模拟题) */
     teacherName?: string
-    /** 学校(老师出题) */
+    /** 学校(模拟题) */
     school?: string
     /** 生成模型(AI 出题) */
     model?: string

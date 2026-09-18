@@ -90,7 +90,7 @@ const PAGE_SIZE = 10
 const sourceChips = [
   { label: '全部来源', value: '' },
   { label: '真题', value: 'real' },
-  { label: '老师出题', value: 'teacher' },
+  { label: '模拟题', value: 'teacher' },
   { label: 'AI出题', value: 'ai' },
 ] as const
 
@@ -127,7 +127,7 @@ function typeLabel(type: PracticeType): string {
 
 /** 来源文案 */
 function sourceLabel(item: MistakeItem): string {
-  if (item.source.type === 'teacher') return item.source.meta.teacherName ?? '老师出题'
+  if (item.source.type === 'teacher') return item.source.meta.teacherName ?? '模拟题'
   if (item.source.type === 'ai') return 'AI出题'
   return item.source.meta.year ? `${item.source.meta.year}年真题` : '真题'
 }

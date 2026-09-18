@@ -165,7 +165,7 @@ const { elapsed, remaining, start, reset } = useCountdown(LIMIT_SECONDS)
 
 const state = ref<'source' | 'list' | 'ai' | 'answer' | 'pending' | 'review'>('source')
 const source = ref<SourceType>('real')
-/** 列表筛选:真题按年份,老师出题按老师名 */
+/** 列表筛选:真题按年份,模拟题按老师名 */
 const filterSelected = ref('全部')
 const list = ref<PracticeListItem[]>([])
 const currentItem = ref<PracticeItem<'cloze'> | null>(null)

@@ -145,7 +145,7 @@ function renderSource(): void {
   const src = stats.value.sourceAccuracy
   const items = [
     { name: '真题', value: src.real },
-    { name: '老师出题', value: src.teacher },
+    { name: '模拟题', value: src.teacher },
     ...(src.ai >= 0 ? [{ name: 'AI出题', value: src.ai }] : []),
   ]
   sourceChart.setOption({

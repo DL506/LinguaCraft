@@ -194,7 +194,7 @@ const columns = computed<DataTableColumns<SubmissionListItem>>(() => [
 
 /** 来源文案 */
 function sourceLabel(item: SubmissionListItem): string {
-  if (item.source.type === 'teacher') return item.source.meta.teacherName ?? '老师出题'
+  if (item.source.type === 'teacher') return item.source.meta.teacherName ?? '模拟题'
   if (item.source.type === 'ai') return 'AI出题'
   return item.source.meta.year ? `${item.source.meta.year}年真题` : '真题'
 }

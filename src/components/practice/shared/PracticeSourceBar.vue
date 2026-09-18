@@ -19,7 +19,7 @@
 import { NButton } from 'naive-ui'
 
 defineProps<{
-  /** 筛选选项(真题为年份集合,老师出题为老师名集合) */
+  /** 筛选选项(真题为年份集合,模拟题为老师名集合) */
   filterChips: string[]
   /** 当前选中的筛选值('全部' 表示不过滤) */
   selected: string
