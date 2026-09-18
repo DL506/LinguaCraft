@@ -18,3 +18,10 @@ npm-debug.log*
 .vscode/*
 !.vscode/extensions.json
 .DS_Store
+
+# 后端(Spring Boot 工程,位于 backend/)
+backend/target/
+backend/build/
+backend/.gradle/
+*.iml
+*.class
