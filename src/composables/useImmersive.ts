@@ -24,14 +24,19 @@ export function useImmersive() {
     immersiveActive.value = false
   })
 
-  /** 开启沉浸:隐藏导航,只留练习头部 */
+  /** 开启沉浸:隐藏导航,只留练习头部;手机答题场景尝试锁竖屏(任务书第 16 章,失败静默) */
   function enableImmersive(): void {
     immersiveActive.value = true
+    const orientation = window.screen?.orientation
+    if (orientation && typeof orientation.lock === 'function') {
+      orientation.lock('portrait').catch(() => {})
+    }
   }
 
-  /** 退出沉浸:恢复导航 */
+  /** 退出沉浸:恢复导航并解除竖屏锁定 */
   function disableImmersive(): void {
     immersiveActive.value = false
+    window.screen?.orientation?.unlock?.()
   }
 
   /** 切换沉浸(答题头部按钮) */

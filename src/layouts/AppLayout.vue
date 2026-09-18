@@ -33,8 +33,12 @@
             <!-- 平板:左侧抽屉二级导航 -->
             <NavDrawer v-if="isTablet" />
 
-            <!-- 手机:顶部栏 -->
-            <n-layout-header v-if="isMobile && !isImmersive" bordered style="height: 48px">
+            <!-- 手机:顶部栏(含安全区 padding,任务书第 16 章) -->
+            <n-layout-header
+              v-if="isMobile && !isImmersive"
+              bordered
+              :style="{ height: 'calc(48px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }"
+            >
               <MobileTopBar />
             </n-layout-header>
 

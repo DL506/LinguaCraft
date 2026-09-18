@@ -16,8 +16,9 @@ export default defineConfig({
     // VITE_USE_MOCK 仅存在于 .env.development,生产构建中它的值为 undefined,MSW 注册代码自动跳过,由 PWA SW 工作。
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico'],
-      manifest: false, // P13 阶段补充 manifest 图标与预缓存配置
+      // 附加预缓存资源:图标与 PWA 清单(hljs 双主题样式已随 css glob 进入预缓存)
+      includeAssets: ['favicon.ico', 'pwa-192.png', 'pwa-512.png', 'manifest.webmanifest'],
+      manifest: false, // 使用 public/manifest.webmanifest 静态文件(含 192/512 图标与 maskable)
       devOptions: { enabled: false },
     }),
   ],

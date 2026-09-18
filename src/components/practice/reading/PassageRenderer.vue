@@ -160,6 +160,11 @@ function onFavClick(): void {
   border-radius: var(--lc-radius);
 }
 
+/* 暗色护眼背景(任务书 5.7:暗色为 #1A1814) */
+:global(html.dark) .passage-renderer.is-eye-protect {
+  background-color: #1a1814;
+}
+
 .passage-renderer__word {
   cursor: pointer;
   border-radius: 4px;

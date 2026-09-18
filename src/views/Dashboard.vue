@@ -26,7 +26,7 @@
     <!-- 待批改提示:数量 > 0 时显示(任务书 10.5/验收 31) -->
     <n-card v-if="pendingCount > 0" class="dashboard__pending" :bordered="false">
       <div class="pending">
-        <n-icon :component="TimeOutline" size="18" color="#F0A020" />
+        <n-icon :component="TimeOutline" size="18" class="pending__icon" />
         <span class="pending__text">你有 {{ pendingCount }} 份提交待批改</span>
         <router-link class="pending__link" to="/user/submissions?status=pending">查看</router-link>
       </div>
@@ -284,6 +284,11 @@ onMounted(async () => {
 .pending__text {
   flex: 1;
   color: var(--lc-text-2);
+}
+
+/* 警告色图标(取主题变量,双主题自适应) */
+.pending__icon {
+  color: var(--lc-warning);
 }
 
 .pending__link {

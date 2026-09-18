@@ -45,3 +45,11 @@ body {
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* 移动端输入框字号 ≥16px(任务书第 16 章:避免 iOS 聚焦自动缩放) */
+@media (max-width: 767px) {
+  .n-input .n-input__input-el,
+  .n-input .n-input__textarea-el {
+    font-size: 16px;
+  }
+}
