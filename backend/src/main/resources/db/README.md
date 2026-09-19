@@ -31,5 +31,7 @@ Get-Content .\backend\src\main\resources\db\V02__create_user_auth_tables.sql -Ra
 | V01 | V01__create_database.sql | 创建数据库 linguacraft(utf8mb4) | MySQL 已启动 | 是 | 已执行 |
 | V02 | V02__create_user_auth_tables.sql | user / user_setting / password_reset_token 三表及索引 | V01 | 是 | 已执行 |
 | S01 | S01__seed_demo_user.sql | 演示账号 demo/123456(BCrypt)与默认设置 | V02 | 是 | 已执行 |
+| V03 | V03__create_question_practice_tables.sql | question / practice_submission / mistake / practice_progress 四表及索引 | V01 | 是 | 已执行 |
+| S02 | S02__seed_questions.sql | 练习题库种子(10 题,由前端 mock 数据生成) | V03 | 是 | 已执行 |
 
 > 后续步骤新增的 V/S 脚本将在此表按序追加。

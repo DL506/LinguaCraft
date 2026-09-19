@@ -73,3 +73,8 @@ lc:
     date: 2027-03-20
     # 备考进度百分比(暂为配置值,计算口径待确认后调整)
     progress: 42
+  grading:
+    # 人工模式下客观题延迟出分阈值(秒):提交后先 pending,到达阈值由定时任务比对出分
+    manual-delay-seconds: 60
+    # 待批改扫描任务执行间隔(毫秒)
+    scan-interval-ms: 30000
