@@ -1,0 +1,75 @@
+# ============================================================
+# LinguaCraft 后端应用配置(替代原 application.properties)
+#
+# 说明:
+#  - 本地默认值直接内联,便于开箱启动;敏感项可通过环境变量覆盖(LC_ 前缀)
+#  - AI 相关为假占位,仅用于本地启动,真实调用会失败(Step 4 配置真实服务后生效)
+# ============================================================
+server:
+  port: 8080
+
+spring:
+  application:
+    name: backend
+
+  # ===== 数据源(本地 MySQL 8.4.7,库结构见 db/README.md 脚本索引)=====
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/linguacraft?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${LC_DB_USERNAME:root}
+    password: ${LC_DB_PASSWORD:00000721}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # ===== JSON 序列化:统一时区,时间字段输出 ISO-8601 =====
+  jackson:
+    time-zone: Asia/Shanghai
+
+  # ===== Spring AI(假占位,真实 key/base-url/model 经环境变量注入)=====
+  ai:
+    openai:
+      api-key: ${LC_AI_API_KEY:sk-fake-placeholder-key}
+      base-url: ${LC_AI_BASE_URL:https://placeholder.invalid/v1}
+      chat:
+        options:
+          model: ${LC_AI_MODEL:fake-model}
+
+  # ===== 邮件(Step 2 找回密码使用;未配置时降级为日志输出重置链接,届时取消注释)=====
+  # mail:
+  #   host: ${LC_MAIL_HOST:}
+  #   port: ${LC_MAIL_PORT:465}
+  #   username: ${LC_MAIL_USERNAME:}
+  #   password: ${LC_MAIL_PASSWORD:}
+
+# ===== MyBatis-Plus =====
+mybatis-plus:
+  configuration:
+    # 数据库下划线命名映射为 Java 驼峰属性
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      # 流水类表主键统一自增(对外经 Jackson 序列化为字符串,满足前端 id:string 契约)
+      id-type: auto
+
+# ===== 接口文档(springdoc,访问 /swagger-ui.html)=====
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# ===== 业务自定义配置 =====
+lc:
+  jwt:
+    # JWT 签名密钥(生产环境必须通过环境变量覆盖)
+    secret: ${LC_JWT_SECRET:linguacraft-dev-secret-change-me-0123456789abcdef}
+    # token 有效期(秒),与前端契约 expiresIn=7200 保持一致
+    expire-seconds: 7200
+  mail:
+    # 重置密码邮件中链接指向的前端页面地址
+    reset-base-url: ${LC_RESET_BASE_URL:http://localhost:5173/reset-password}
+  exam:
+    # 广东专插本考试日期(首页倒计时计算基准)
+    date: 2027-03-20
+    # 备考进度百分比(暂为配置值,计算口径待确认后调整)
+    progress: 42

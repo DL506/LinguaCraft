@@ -19,6 +19,9 @@ npm-debug.log*
 !.vscode/extensions.json
 .DS_Store
 
+# IDE 本地规划/缓存目录(不入库)
+.qoder/
+
 # 后端(Spring Boot 工程,位于 backend/)
 backend/target/
 backend/build/

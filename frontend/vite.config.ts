@@ -30,5 +30,14 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // 联调代理:后端运行在 8080(任务契约 Base URL = /api)。
+    // 联调时在 .env.development.local 中设置 VITE_USE_MOCK=false 关闭 MSW,请求经此代理转发到后端;
+    // 演示开发保持 .env.development 的 VITE_USE_MOCK=true 时,请求由 MSW 拦截,不会到达此代理。
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
   },
 })
