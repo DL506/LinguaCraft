@@ -2,6 +2,9 @@ package com.linguacraft.backend.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linguacraft.backend.ai.AiGradingService;
+import com.linguacraft.backend.ai.GradedWriting;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,12 +37,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 刷题服务:五种题型统一的列表 / 详情 / 提交 / 作答进度(断点续答)。
@@ -78,6 +83,7 @@ public class PracticeService {
     private final PracticeProgressMapper progressMapper;
     private final UserSettingMapper userSettingMapper;
     private final ObjectiveGradingService objectiveGradingService;
+    private final AiGradingService aiGradingService;
     private final ObjectMapper objectMapper;
 
     /** 人工模式下客观题延迟出分阈值(秒) */
@@ -90,6 +96,7 @@ public class PracticeService {
                            PracticeProgressMapper progressMapper,
                            UserSettingMapper userSettingMapper,
                            ObjectiveGradingService objectiveGradingService,
+                           AiGradingService aiGradingService,
                            ObjectMapper objectMapper) {
         this.questionMapper = questionMapper;
         this.submissionMapper = submissionMapper;
@@ -97,6 +104,7 @@ public class PracticeService {
         this.progressMapper = progressMapper;
         this.userSettingMapper = userSettingMapper;
         this.objectiveGradingService = objectiveGradingService;
+        this.aiGradingService = aiGradingService;
         this.objectMapper = objectMapper;
     }
 
@@ -204,8 +212,32 @@ public class PracticeService {
 
         PracticeSubmission submission = newSubmissionBase(question, userId, body, now);
 
-        // 写作:人工模式一律 pending;AI 模式待 Step 4 接入 Spring AI 自动评分(当前统一转人工)
+        // 写作:AI 模式由 AI 全权评分;失败或人工模式走 pending 转人工(已确认裁决)
         if ("writing".equals(question.getType())) {
+            if (METHOD_AI.equals(preference)) {
+                try {
+                    String content = body.getAnswers() == null ? "" : body.getAnswers().path("content").asText("");
+                    GradedWriting gradedWriting = aiGradingService.gradeWriting(question, content);
+                    ObjectNode writingResult = objectMapper.createObjectNode();
+                    writingResult.set("dimensions", objectMapper.valueToTree(gradedWriting.dimensions()));
+                    if (gradedWriting.sampleAnswer() != null) {
+                        writingResult.put("sampleAnswer", gradedWriting.sampleAnswer());
+                    }
+                    if (gradedWriting.overallComment() != null) {
+                        writingResult.put("overallComment", gradedWriting.overallComment());
+                    }
+                    submission.setStatus(STATUS_GRADED);
+                    submission.setGradingMethod(METHOD_AI);
+                    submission.setScore(gradedWriting.score());
+                    submission.setWritingResult(writingResult.toString());
+                    submission.setGradedAt(now);
+                    submissionMapper.insert(submission);
+                    clearProgress(userId, id);
+                    return buildResult(submission);
+                } catch (BizException e) {
+                    log.warn("AI 作文评分失败,降级为人工 pending: {}", e.getMessage());
+                }
+            }
             submission.setStatus(STATUS_PENDING);
             submission.setGradingMethod(METHOD_MANUAL);
             submission.setEstimatedTime(ESTIMATED_TIME);
@@ -236,14 +268,30 @@ public class PracticeService {
         }
 
         if (instant) {
-            // AI 模式但题库无答案:待 Step 4 接入 AI 批改;当前降级转人工 pending
-            submission.setStatus(STATUS_PENDING);
-            submission.setGradingMethod(METHOD_MANUAL);
-            submission.setEstimatedTime(ESTIMATED_TIME);
-            submission.setTotalCount(countObjectiveItems(question));
-            submissionMapper.insert(submission);
-            clearProgress(userId, id);
-            return buildResult(submission);
+            // AI 模式但题库无答案:由 AI 批改;失败降级转人工 pending(已确认裁决)
+            try {
+                GradedObjective graded = aiGradingService.gradeObjective(question, toAnswerMap(body.getAnswers()));
+                submission.setStatus(STATUS_GRADED);
+                submission.setGradingMethod(METHOD_AI);
+                submission.setScore(graded.score());
+                submission.setCorrectCount(graded.correctCount());
+                submission.setTotalCount(graded.totalCount());
+                submission.setDetails(writeJson(graded.details()));
+                submission.setGradedAt(now);
+                submissionMapper.insert(submission);
+                recordMistakes(userId, question, graded.details());
+                clearProgress(userId, id);
+                return buildResult(submission);
+            } catch (BizException e) {
+                log.warn("AI 客观题批改失败,降级转人工 pending: {}", e.getMessage());
+                submission.setStatus(STATUS_PENDING);
+                submission.setGradingMethod(METHOD_MANUAL);
+                submission.setEstimatedTime(ESTIMATED_TIME);
+                submission.setTotalCount(countObjectiveItems(question));
+                submissionMapper.insert(submission);
+                clearProgress(userId, id);
+                return buildResult(submission);
+            }
         }
 
         // 人工模式:先 pending(稍后出结果);有答案者由定时任务延迟比对出分,无答案保持 pending 转人工
@@ -352,6 +400,83 @@ public class PracticeService {
             }
         }
         return processed;
+    }
+
+    /**
+     * 智能练习(POST /api/practice/smart):优先未做过的题目,按题型得分率低者加权(默认口径)。
+     *
+     * @return 推荐的一道题目(ForAnswer,type 取自题目本身)
+     */
+    public PracticeItemResponse smart() {
+        Long userId = SecurityUtils.getCurrentUserId();
+        List<Question> all = questionMapper.selectList(
+                Wrappers.<Question>lambdaQuery().eq(Question::getStatus, 1));
+        if (all.isEmpty()) {
+            throw new BizException(ResultCode.NOT_FOUND.getCode(), "题库为空");
+        }
+        Set<String> doneQuestionIds = submissionMapper.selectList(
+                        Wrappers.<PracticeSubmission>lambdaQuery().eq(PracticeSubmission::getUserId, userId))
+                .stream().map(PracticeSubmission::getQuestionId).collect(Collectors.toSet());
+        List<Question> candidates = all.stream()
+                .filter(question -> !doneQuestionIds.contains(question.getId()))
+                .collect(Collectors.toList());
+        if (candidates.isEmpty()) {
+            candidates = all; // 全部做过:从全量中随机
+        }
+        Question picked = weightedRandom(candidates, typeWeights(userId));
+        return detail(picked.getType(), picked.getId());
+    }
+
+    /**
+     * 计算题型权重:用户得分率越低权重越高(无数据按 0.5 估)。
+     *
+     * @param userId 用户 ID
+     * @return 题型 -> 权重
+     */
+    private Map<String, Double> typeWeights(Long userId) {
+        List<PracticeSubmission> gradedSubmissions = submissionMapper.selectList(
+                Wrappers.<PracticeSubmission>lambdaQuery()
+                        .eq(PracticeSubmission::getUserId, userId)
+                        .eq(PracticeSubmission::getStatus, STATUS_GRADED));
+        Map<String, BigDecimal> scoreSum = new HashMap<>();
+        Map<String, BigDecimal> totalSum = new HashMap<>();
+        for (PracticeSubmission submission : gradedSubmissions) {
+            if (submission.getScore() == null || submission.getTotalScore() == null
+                    || submission.getTotalScore().compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            scoreSum.merge(submission.getType(), submission.getScore(), BigDecimal::add);
+            totalSum.merge(submission.getType(), submission.getTotalScore(), BigDecimal::add);
+        }
+        Map<String, Double> weights = new HashMap<>();
+        for (String type : VALID_TYPES) {
+            BigDecimal total = totalSum.get(type);
+            double accuracy = total == null ? 0.5
+                    : scoreSum.get(type).doubleValue() / total.doubleValue();
+            weights.put(type, 1.0 + (1.0 - Math.max(0.0, Math.min(1.0, accuracy))));
+        }
+        return weights;
+    }
+
+    /**
+     * 按题型权重随机选择题目。
+     *
+     * @param candidates 候选题目
+     * @param weights    题型权重
+     * @return 选中的题目
+     */
+    private Question weightedRandom(List<Question> candidates, Map<String, Double> weights) {
+        double totalWeight = candidates.stream()
+                .mapToDouble(question -> weights.getOrDefault(question.getType(), 1.0)).sum();
+        double random = Math.random() * totalWeight;
+        double cumulative = 0;
+        for (Question question : candidates) {
+            cumulative += weights.getOrDefault(question.getType(), 1.0);
+            if (random <= cumulative) {
+                return question;
+            }
+        }
+        return candidates.get(candidates.size() - 1);
     }
 
     // ==================== 内部工具 ====================

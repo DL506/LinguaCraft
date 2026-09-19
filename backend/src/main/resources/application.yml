@@ -78,3 +78,6 @@ lc:
     manual-delay-seconds: 60
     # 待批改扫描任务执行间隔(毫秒)
     scan-interval-ms: 30000
+  ai:
+    # AI 调用超时(秒):作文评分超时降级 pending;出题失败返回可重试错误
+    timeout-seconds: 60

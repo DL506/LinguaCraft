@@ -1,7 +1,9 @@
 package com.linguacraft.backend.controller;
 
+import com.linguacraft.backend.ai.AiGenerateService;
 import com.linguacraft.backend.common.PageResult;
 import com.linguacraft.backend.common.R;
+import com.linguacraft.backend.dto.practice.GenerateRequest;
 import com.linguacraft.backend.dto.practice.PracticeItemResponse;
 import com.linguacraft.backend.dto.practice.PracticeListItemResponse;
 import com.linguacraft.backend.dto.practice.PracticeSubmitRequest;
@@ -35,8 +37,11 @@ public class PracticeController {
 
     private final PracticeService practiceService;
 
-    public PracticeController(PracticeService practiceService) {
+    private final AiGenerateService aiGenerateService;
+
+    public PracticeController(PracticeService practiceService, AiGenerateService aiGenerateService) {
         this.practiceService = practiceService;
+        this.aiGenerateService = aiGenerateService;
     }
 
     /**
@@ -126,5 +131,30 @@ public class PracticeController {
             @RequestBody ProgressRequest request) {
         practiceService.saveProgress(type, id, request);
         return R.ok();
+    }
+
+    /**
+     * AI 出题(点即生成、无参数面板)。
+     *
+     * @param body 请求(题型)
+     * @return 统一响应:data 为生成的题目(ForAnswer)
+     */
+    @Operation(summary = "AI 出题", description = "点即生成、无参数面板(任务书 10.6):AI 生成并持久化(source=ai),可用于后续详情/提交/错题重做;失败返回 code 500(前端可重试)")
+    @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功,code=1004 题型非法,code=500 生成失败可重试")
+    @PostMapping("/generate")
+    public R<PracticeItemResponse> generate(@RequestBody GenerateRequest body) {
+        return R.ok(aiGenerateService.generate(body == null ? null : body.getType()));
+    }
+
+    /**
+     * 智能练习(推荐一道题)。
+     *
+     * @return 统一响应:data 为推荐题目(ForAnswer)
+     */
+    @Operation(summary = "智能练习", description = "首页快捷入口:优先未做过的题目,按题型得分率低者加权;返回 PracticeItem,type 从返回值读取")
+    @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功,code=404 题库为空")
+    @PostMapping("/smart")
+    public R<PracticeItemResponse> smart() {
+        return R.ok(practiceService.smart());
     }
 }
