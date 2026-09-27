@@ -57,7 +57,7 @@ public class ObjectiveGradingService {
             for (AnswerItemDto item : key.getBlanks()) {
                 String userAnswer = answers.getOrDefault(item.getId(), "");
                 boolean isCorrect = grammarFill
-                        ? judgeGrammarBlank(userAnswer, item, caseSensitive)
+                        ? judgeGrammarBlank(userAnswer, item.getAnswer(), item.getAcceptAlternatives(), caseSensitive)
                         : userAnswer.equals(item.getAnswer());
                 if (isCorrect) {
                     correctCount++;
@@ -73,21 +73,22 @@ public class ObjectiveGradingService {
     }
 
     /**
-     * 语法填空单空判分:trim + 大小写策略 + 替代答案。
+     * 语法填空单空判分:trim + 大小写策略 + 替代答案(公开方法,供整卷模考判分复用)。
      *
      * @param userText      用户输入
-     * @param item          答案项(标准答案 + 可接受替代答案)
+     * @param answer        标准答案
+     * @param alternatives  可接受替代答案(可空)
      * @param caseSensitive 是否区分大小写
      * @return 是否答对
      */
-    private boolean judgeGrammarBlank(String userText, AnswerItemDto item, boolean caseSensitive) {
+    public boolean judgeGrammarBlank(String userText, String answer, List<String> alternatives, boolean caseSensitive) {
         String input = userText == null ? "" : userText.trim();
         List<String> candidates = new ArrayList<>();
-        if (item.getAnswer() != null) {
-            candidates.add(item.getAnswer());
+        if (answer != null) {
+            candidates.add(answer);
         }
-        if (item.getAcceptAlternatives() != null) {
-            candidates.addAll(item.getAcceptAlternatives());
+        if (alternatives != null) {
+            candidates.addAll(alternatives);
         }
         for (String candidate : candidates) {
             if (candidate == null) {
