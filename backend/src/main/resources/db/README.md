@@ -38,5 +38,7 @@ Get-Content .\backend\src\main\resources\db\V02__create_user_auth_tables.sql -Ra
 | V06 | V06__create_vocab_grammar_tables.sql | 词书/单词/进度/复习日志/语法树/语法章节 六表 | V01 | 是 | 已执行 |
 | S04 | S04__seed_vocab.sql | 词书 3 本 + 演示单词 20 词(wordStore 迁移) | V06 | 是 | 已执行 |
 | S05 | S05__seed_grammar.sql | 语法目录 18 节点 + 12 章节 markdown(grammar-tree 迁移) | V06 | 是 | 已执行 |
+| V07 | V07__create_favorite_table.sql | favorite 收藏表 | V01 | 是 | 已执行 |
+| S06 | S06__seed_demo_history.sql | 演示历史数据(demo:提交 3/错题 2/收藏 2/词进度 3/复习日志 2) | V03/V06/V07 | 是 | 已执行 |
 
 > 后续步骤新增的 V/S 脚本将在此表按序追加。

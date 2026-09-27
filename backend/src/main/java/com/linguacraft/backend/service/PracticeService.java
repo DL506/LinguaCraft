@@ -659,10 +659,12 @@ public class PracticeService {
     /**
      * 提交实体 -> 统一提交结果响应(details 仅 graded 下发;写作扩展字段从 writingResult 提取)。
      *
+     * <p>public 供“我的提交”详情(GET /api/user/submissions/:id)复用。</p>
+     *
      * @param submission 提交实体
      * @return 响应
      */
-    private SubmitResultResponse buildResult(PracticeSubmission submission) {
+    public SubmitResultResponse buildResult(PracticeSubmission submission) {
         SubmitResultResponse.SubmitResultResponseBuilder builder = SubmitResultResponse.builder()
                 .submissionId(submission.getId())
                 .type(submission.getType())
