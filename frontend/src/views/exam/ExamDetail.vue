@@ -40,7 +40,7 @@
     </div>
 
     <!-- 答题态:整卷答题组件 -->
-    <ExamPaper v-else-if="state === 'answering' && paper" ref="paperRef" :paper="paper" />
+    <ExamPaper v-else-if="state === 'answering' && paper" ref="paperRef" :paper="paper" @progress-change="onProgressChange" />
 
     <!-- 待批改态(人工批改成整卷待批改) -->
     <PendingView
@@ -70,7 +70,8 @@ import ExamPaper from '@/components/exam/ExamPaper.vue'
 import ExamReport from '@/components/exam/ExamReport.vue'
 import PendingView from '@/components/common/PendingView.vue'
 import CountdownTimer from '@/components/common/CountdownTimer.vue'
-import { getExamPaper, getExamReport, submitExam } from '@/api/exam'
+import { getExamPaper, getExamProgress, getExamReport, saveExamProgress, submitExam } from '@/api/exam'
+import { nextTick } from 'vue'
 import { useCountdown } from '@/composables/useCountdown'
 import { useImmersive } from '@/composables/useImmersive'
 import type { ExamPaper as ExamPaperData, ExamReport as ExamReportData } from '@/types/exam'
@@ -100,7 +101,35 @@ onMounted(async () => {
   paper.value = await getExamPaper(examId)
   state.value = 'answering'
   start()
+  await nextTick()
+  void restoreExamProgress()
 })
+
+/** 断点续答(扩展契约 E2):恢复进度(无进度时静默跳过) */
+async function restoreExamProgress(): Promise<void> {
+  try {
+    const data = await getExamProgress(examId)
+    if (data) paperRef.value?.restoreFromProgress(data)
+  } catch {
+    // 静默:恢复失败不影响答题
+  }
+}
+
+/** 断点续答(扩展契约 E2):作答变更防抖保存(仅答题态) */
+let examProgressTimer: ReturnType<typeof setTimeout> | undefined
+function onProgressChange(): void {
+  if (examProgressTimer) clearTimeout(examProgressTimer)
+  examProgressTimer = setTimeout(() => {
+    if (state.value !== 'answering') return
+    const snap = paperRef.value?.snapshot()
+    if (!snap) return
+    saveExamProgress(examId, {
+      objective: snap.objective,
+      writing: snap.writing,
+      duration: elapsed.value,
+    }).catch(() => {})
+  }, 1500)
+}
 
 /** 交卷:未答提醒后确认(10.12) */
 function onSubmit(): void {

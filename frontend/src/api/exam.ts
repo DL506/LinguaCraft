@@ -1,5 +1,5 @@
 // 真题模考域 API 封装(任务书 12.4)
-import { get, post } from './request'
+import { get, post, put } from './request'
 import type { PageResult } from '@/types/api'
 import type { ExamListItem, ExamPaper, ExamReport, ExamSubmitRequest } from '@/types/exam'
 import type { SubmitResult } from '@/types/practice'
@@ -25,4 +25,21 @@ export function submitExam(id: string, payload: ExamSubmitRequest): Promise<Subm
 /** 成绩报告:submissionId 来自交卷响应 */
 export function getExamReport(submissionId: string): Promise<ExamReport> {
   return get<ExamReport>(`/exam/submission/${submissionId}/report`)
+}
+
+/** 读取模考作答进度(扩展契约 E2 断点续答;无进度时 data 为 null) */
+export function getExamProgress(id: string): Promise<{
+  objective: Record<number, string>
+  writing?: { content: string }
+  duration: number
+} | null> {
+  return get(`/exam/${id}/progress`)
+}
+
+/** 保存模考作答进度(覆盖式,扩展契约 E2;交卷成功后由服务端清除) */
+export function saveExamProgress(
+  id: string,
+  payload: { objective: Record<number, string>; writing?: { content: string }; duration: number }
+): Promise<null> {
+  return put(`/exam/${id}/progress`, payload)
 }

@@ -99,6 +99,7 @@ import { generatePractice, getPracticeDetail, getPracticeList, submitPractice } 
 import { getSubmissionDetail } from '@/api/user'
 import { useDevice } from '@/composables/useDevice'
 import { useCountdown } from '@/composables/useCountdown'
+import { usePracticeProgress } from '@/composables/usePracticeProgress'
 import { usePlaceholder } from '@/composables/usePlaceholder'
 import { usePracticeStore } from '@/stores/practice'
 import type { PracticeItem, PracticeListItem, SourceType, SubmitDetail } from '@/types/practice'
@@ -207,6 +208,15 @@ async function loadAndAnswer(id: string): Promise<void> {
   startAnswer(detail)
 }
 
+/** 断点续答(扩展契约 E1):作答变更防抖保存;提交成功后由服务端清除 */
+const { restoreCurrent: restoreProgress } = usePracticeProgress({
+  type: 'matching',
+  answers,
+  itemId: () => currentItem.value?.id ?? null,
+  isAnswering: () => state.value === 'answer',
+  duration: () => elapsed.value,
+})
+
 function startAnswer(item: PracticeItem<'matching'>): void {
   currentItem.value = item
   answers.value = {}
@@ -216,6 +226,7 @@ function startAnswer(item: PracticeItem<'matching'>): void {
   reset(LIMIT_SECONDS)
   state.value = 'answer'
   start()
+  void restoreProgress()
 }
 
 async function onReview(item: PracticeListItem): Promise<void> {

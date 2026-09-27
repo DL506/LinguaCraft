@@ -1,5 +1,5 @@
 // 刷题域 API 封装:五种题型统一 list/detail/submit + AI 出题(任务书 12.3)
-import { get, post } from './request'
+import { get, post, put } from './request'
 import type { PageResult } from '@/types/api'
 import type {
   PracticeItem,
@@ -38,4 +38,21 @@ export function submitPractice(
 /** AI 出题:点即生成,无参数面板(任务书 10.6) */
 export function generatePractice(type: PracticeType): Promise<PracticeItem> {
   return post<PracticeItem>('/practice/generate', { type })
+}
+
+/** 读取作答进度(扩展契约 E1 断点续答;无进度时 data 为 null) */
+export function getPracticeProgress(
+  type: PracticeType,
+  id: string
+): Promise<{ answers: Record<number, string> | { content: string }; duration: number } | null> {
+  return get(`/practice/detail/${type}/${id}/progress`)
+}
+
+/** 保存作答进度(覆盖式,扩展契约 E1;提交成功后由服务端清除) */
+export function savePracticeProgress(
+  type: PracticeType,
+  id: string,
+  payload: { answers: Record<number, string> | { content: string }; duration: number }
+): Promise<null> {
+  return put(`/practice/detail/${type}/${id}/progress`, payload)
 }

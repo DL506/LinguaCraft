@@ -97,6 +97,7 @@ import WritingEditor from '@/components/practice/writing/WritingEditor.vue'
 import { generatePractice, getPracticeDetail, getPracticeList, submitPractice } from '@/api/practice'
 import { getSubmissionDetail } from '@/api/user'
 import { useCountdown } from '@/composables/useCountdown'
+import { getPracticeProgress, savePracticeProgress } from '@/api/practice'
 import { usePracticeStore } from '@/stores/practice'
 import type { PracticeItem, PracticeListItem, SourceType, WritingSubmitResult } from '@/types/practice'
 
@@ -196,6 +197,9 @@ function draftKey(itemId: string): string {
   return `lc-writing-draft-${itemId}`
 }
 
+/** 断点续答保存防抖计时器(扩展契约 E1) */
+let progressTimer: number | undefined
+
 function startAnswer(item: PracticeItem<'writing'>): void {
   currentItem.value = item
   gradedResult.value = null
@@ -204,6 +208,18 @@ function startAnswer(item: PracticeItem<'writing'>): void {
   reset(0)
   state.value = 'answer'
   start()
+  void restoreWritingProgress(item.id)
+}
+
+/** 断点续答(扩展契约 E1):恢复后端进度(有值则优先于本地草稿) */
+async function restoreWritingProgress(id: string): Promise<void> {
+  try {
+    const data = await getPracticeProgress('writing', id)
+    const saved = data?.answers && 'content' in data.answers ? String(data.answers.content ?? '') : ''
+    if (saved) content.value = saved
+  } catch {
+    // 静默:恢复失败不影响作答
+  }
 }
 
 async function onReview(item: PracticeListItem): Promise<void> {
@@ -282,6 +298,16 @@ watch(content, (val) => {
   draftTimer = window.setTimeout(() => {
     if (val.trim()) localStorage.setItem(draftKey(currentItem.value!.id), val)
   }, 500)
+  // 断点续答(扩展契约 E1):正文变更防抖保存到后端
+  window.clearTimeout(progressTimer)
+  progressTimer = window.setTimeout(() => {
+    if (currentItem.value && state.value === 'answer') {
+      savePracticeProgress('writing', currentItem.value.id, {
+        answers: { content: content.value },
+        duration: elapsed.value,
+      }).catch(() => {})
+    }
+  }, 1500)
 })
 
 onMounted(async () => {

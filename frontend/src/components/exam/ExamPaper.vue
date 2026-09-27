@@ -155,7 +155,7 @@
 <script setup lang="ts">
 // 作答存储:objective(全局编号 1-45 → 选项 key/填空文本)+ writing(作文正文)
 // 对外通过 getPayload() 暴露交卷数据(父页面在交卷时调用)
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { NButton, useMessage } from 'naive-ui'
 import PassageRenderer from '@/components/practice/reading/PassageRenderer.vue'
 import QuestionItem from '@/components/practice/reading/QuestionItem.vue'
@@ -197,6 +197,10 @@ const activePart = ref(1)
 const objective = ref<Record<number, string>>({})
 /** 作文正文 */
 const writing = ref('')
+
+/** 断点续答(扩展契约 E2):作答变更通知父级(父级防抖保存进度) */
+const emit = defineEmits<{ progressChange: [] }>()
+watch([objective, writing], () => emit('progressChange'), { deep: true })
 /** 五选五交互态(复用 10.8 逻辑) */
 const activeBlankId = ref<number | null>(null)
 const activeOptionKey = ref<string | null>(null)
@@ -371,7 +375,25 @@ function unansweredCount(): number {
   return count
 }
 
-defineExpose({ getPayload, unansweredCount })
+/** 断点续答(扩展契约 E2):恢复进度到本地作答 */
+function restoreFromProgress(data: { objective?: Record<number, string>; writing?: { content: string } }): void {
+  if (data.objective && typeof data.objective === 'object') {
+    objective.value = { ...data.objective }
+  }
+  if (data.writing?.content) {
+    writing.value = data.writing.content
+  }
+}
+
+/** 断点续答(扩展契约 E2):导出当前作答快照 */
+function snapshot(): { objective: Record<number, string>; writing?: { content: string } } {
+  return {
+    objective: { ...objective.value },
+    writing: writing.value ? { content: writing.value } : undefined,
+  }
+}
+
+defineExpose({ getPayload, unansweredCount, restoreFromProgress, snapshot })
 </script>
 
 <style scoped>
