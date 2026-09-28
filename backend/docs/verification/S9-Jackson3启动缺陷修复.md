@@ -52,6 +52,26 @@
   | `GET /v3/api-docs` | openapi `3.1.0`,paths **32**,schemas **72**,tags **7** | 32 条路径模板承载 36 个映射(4 条各有两个方法:`/api/user/settings` GET+PUT、`/api/user/favorites` GET+POST、`/api/practice/detail/{type}/{id}/progress` GET+PUT、`/api/exam/{id}/progress` GET+PUT) |
   | `GET /swagger-ui/index.html` | HTTP 200 | 文档可渲染 |
 
+### 3.1 写路径取证(本轮迁移的真正高风险面:JsonNode 请求体绑定与落库)
+
+| 步骤 | 结果 |
+|---|---|
+| `PUT /api/practice/detail/cloze/cloze-real-2023-1/progress`(`{"answers":{"1":"A","2":"Z"},"duration":66}`)→ `GET` | code=0;回读 `answers.1=A`、`answers.2=Z`、`duration=66` |
+| `POST .../submit`(10 空,故意错 2 空) | code=0;`status=graded`、`submissionId="4"`(String)、`correctCount/totalCount=8/10`、`score=16.0`、`totalScore=20.0`(得分为前者,满分为后者)、`details` 10 条、错的两个空位(id=9、id=10)均带 explanation |
+| `GET /api/user/submissions/4` | code=0;`details` 10 条(库内 details JSON → `List<SubmitDetailDto>` 解析正常) |
+| 提交后再 `GET .../progress` | `data=null`(提交自动清除断点进度) |
+| `PUT /api/exam/exam-2026/progress`(`objective` + `writing` 两个 JsonNode 字段)→ `GET` | code=0;回读 `objective.16=A`、`objective.45=D`、`writing.content` 完整、`duration=120` |
+| `GET /api/user/mistakes` | `total=4`(基线 2 + 本次 2 条错行一致) |
+| `GET /swagger-ui.html` | HTTP 302 → `/swagger-ui/index.html` HTTP 200 |
+| 已提交题目再 `GET .../detail` | code=0;响应仍无 `"answer"` 字段 |
+
+取证产生的数据已一次性复位到取证前基线(`practice_submission` 3 条且状态分布 `1:graded/ai,2:pending/manual,3:graded/auto`、`mistake` 2 条、`practice_progress` 0、`exam_progress` 0,并将两张表 AUTO_INCREMENT 回拨为 4/3),不影响 S6/S7/S8 文档中的演示数据口径。
+
+### 3.2 静态清零核对
+
+- `com.fasterxml.jackson.(databind|core)` 在 `src/**/*.java` 仅剩 3 处**注释文字**(JacksonConfig 踩坑说明 + 2 处 `fields()→properties()` 变更说明),无任何代码引用;`tools.jackson.*` 引用 36 处。
+- 计划指定命令 `.\mvnw.cmd -q -DskipTests compile` 退出码 0;更强证据为 `.\mvnw.cmd clean compile` 的 `BUILD SUCCESS`(javac 全量重编)。
+
 ## 四、你如何复现验证
 
 ```powershell
