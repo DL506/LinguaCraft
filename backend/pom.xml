@@ -29,6 +29,8 @@
 	<properties>
 		<java.version>21</java.version>
 		<spring-ai.version>2.0.1</spring-ai.version>
+		<!-- springdoc 3.1.0 内部使用 swagger-core-jakarta 2.2.52,注解包必须对齐 -->
+		<swagger.version>2.2.52</swagger.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -38,6 +40,24 @@
 				<version>${spring-ai.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
+			</dependency>
+			<!--
+				强制对齐 swagger 注解包版本。
+				背景:spring-ai 传递依赖带来了旧版 io.swagger.core.v3:swagger-annotations:2.2.31(来自 openai-java-core)
+				与 swagger-annotations-jakarta:2.2.38(来自 spring-ai-client-chat),
+				而 springdoc 3.1.0 依赖的 swagger-core-jakarta:2.2.52 会调用新版注解才有的
+				Schema.$dynamicRef()。类同名不同版本共存时,访问 /v3/api-docs 会抛
+				NoSuchMethodError( swagger-ui 空列表)。
+			-->
+			<dependency>
+				<groupId>io.swagger.core.v3</groupId>
+				<artifactId>swagger-annotations-jakarta</artifactId>
+				<version>${swagger.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>io.swagger.core.v3</groupId>
+				<artifactId>swagger-annotations</artifactId>
+				<version>${swagger.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>

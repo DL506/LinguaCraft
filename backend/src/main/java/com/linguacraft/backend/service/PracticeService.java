@@ -2,12 +2,12 @@ package com.linguacraft.backend.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.node.ObjectNode;
 import com.linguacraft.backend.ai.AiGradingService;
 import com.linguacraft.backend.ai.GradedWriting;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.common.PageResult;
 import com.linguacraft.backend.common.ResultCode;
@@ -590,7 +590,8 @@ public class PracticeService {
         if (answers == null || !answers.isObject()) {
             return map;
         }
-        answers.fields().forEachRemaining(entry -> {
+        // Jackson 3:JsonNode.fields() 已改名为 properties(),返回 Set<Entry<String,JsonNode>>
+        answers.properties().forEach(entry -> {
             try {
                 map.put(Integer.parseInt(entry.getKey()), entry.getValue().asText(""));
             } catch (NumberFormatException ignored) {

@@ -1,6 +1,6 @@
 package com.linguacraft.backend.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.linguacraft.backend.common.R;
 import com.linguacraft.backend.common.ResultCode;
 import jakarta.servlet.http.HttpServletRequest;

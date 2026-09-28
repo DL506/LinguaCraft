@@ -12,11 +12,13 @@
 | S6 背单词与学语法 | [S6-背单词与学语法.md](S6-背单词与学语法.md) | V06 / S04 / S05 |
 | S7 个人中心与统计 | [S7-个人中心与统计.md](S7-个人中心与统计.md) | V07 / S06 |
 | S8 联调收尾与全量验收 | [S8-联调收尾.md](S8-联调收尾.md) | (无) |
+| S9 Jackson 3 迁移与启动缺陷修复 | [S9-Jackson3启动缺陷修复.md](S9-Jackson3启动缺陷修复.md) | (无) |
 
 ## 通用前置
 
 - 本地 MySQL 8.4.7 已启动(Windows 服务 `MySQL`;若未启动需以管理员执行 `net start MySQL`)。
 - 后端启动:`cd backend` → `.\mvnw.cmd spring-boot:run`(端口 8080)。
+- 编译复核一律带 `clean`(`.\mvnw.cmd clean compile`):IDE 的 Eclipse 编译器可能把"带编译错误的占位类"写进 `target/classes`,普通增量编译会误判为最新(详见 S9 缺陷 3)。
 - 前端启动:`cd frontend` → `npm run dev`(端口 5173)。
 - 联调关闭 MSW:`frontend/.env.development.local` 写入 `VITE_USE_MOCK=false`(该文件不入库)。
 - 接口调试入口:Swagger UI `http://localhost:8080/swagger-ui.html`(先调登录接口,再把 token 填入 Authorize)。

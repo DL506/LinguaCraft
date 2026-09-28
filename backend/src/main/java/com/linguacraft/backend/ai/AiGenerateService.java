@@ -1,9 +1,9 @@
 package com.linguacraft.backend.ai;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.common.ResultCode;
 import com.linguacraft.backend.dto.practice.PracticeItemResponse;

@@ -58,6 +58,7 @@ cd backend
 - 批改状态机:AI 模式即时出分;人工模式先 pending、约 1 分钟后自动流转;写作 AI 全权评分,失败降级转人工;
 - 断点续答(扩展契约):练习 E1 `/api/practice/detail/{type}/{id}/progress`、模考 E2 `/api/exam/{id}/progress`(前端已对接,提交/交卷后自动清除);
 - 统计口径:`/api/user/stats` 的 `typeAccuracy.grammar` 映射 `grammar-fill`,`sourceAccuracy` 无数据返回 -1。
+- **JSON 栈统一为 Jackson 3**(`tools.jackson.*`,Spring Boot 4 默认):实体主键 `Long` 由 `config/JacksonConfig` 的 `JacksonModule` Bean 全局序列化为字符串(对应前端 `id: string`)。不得再使用 `com.fasterxml.jackson.databind/core` 的类(`com.fasterxml.jackson.annotation` 注解包除外);swagger 注解包版本已在 `pom.xml` 固定为 2.2.52,勿降级。背景见 `docs/verification/S9-Jackson3启动缺陷修复.md`。
 
 ## 目录速览
 

@@ -2,8 +2,8 @@ package com.linguacraft.backend.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.common.PageResult;
 import com.linguacraft.backend.common.ResultCode;

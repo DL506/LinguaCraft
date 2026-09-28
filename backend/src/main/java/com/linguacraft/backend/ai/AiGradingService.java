@@ -1,6 +1,6 @@
 package com.linguacraft.backend.ai;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.common.ResultCode;
 import com.linguacraft.backend.dto.practice.SubmitDetailDto;
