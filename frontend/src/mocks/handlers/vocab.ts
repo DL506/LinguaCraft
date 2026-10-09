@@ -57,6 +57,15 @@ export const vocabHandlers = [
     return ok(paginateCycle(base, book.total, page, size))
   }),
 
+  /** 查词(扩展契约 E3):大小写无关精确匹配;未收录返回 data=null(与后端 /api/vocab/lookup 口径一致) */
+  http.get('/api/vocab/lookup', async ({ request }) => {
+    await delay()
+    if (!currentUser(request)) return fail(401, '未登录或登录已过期', 401)
+    const clean = (new URL(request.url).searchParams.get('word') ?? '').trim().toLowerCase()
+    if (!clean) return ok(null)
+    return ok(wordStore.find((w) => w.spelling.toLowerCase() === clean) ?? null)
+  }),
+
   /** 记忆自评提交:unknown/fuzzy/known,完成计数 +1(12.5) */
   http.post('/api/vocab/review', async ({ request }) => {
     await delay()

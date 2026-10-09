@@ -92,6 +92,20 @@ public class VocabController {
     }
 
     /**
+     * 查词(阅读页点词查词)。
+     *
+     * @param word 待查单词
+     * @return 统一响应:data 为命中的 Word,词库未收录时为 null
+     */
+    @Operation(summary = "查词", description = "大小写无关的精确匹配(不做词形归并);未收录返回 code=0 且 data=null,由前端提示“词库未收录”")
+    @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功(data 可为 null)")
+    @GetMapping("/lookup")
+    public R<WordDto> lookup(
+            @Parameter(description = "待查单词", required = true, example = "abandon") @RequestParam("word") String word) {
+        return R.ok(vocabService.lookup(word));
+    }
+
+    /**
      * 到期复习单词分页。
      *
      * @param page 页码

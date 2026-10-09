@@ -124,6 +124,22 @@ function withSubmitInfo(item: StoredPracticeItem<PracticeType>): PracticeListIte
   }
 }
 
+/** 作答进度载荷(扩展契约 E1:断点续答) */
+interface PracticeProgress {
+  /** 作答内容:客观题为 { 题号: 答案 },写作为 { content } */
+  answers: Record<number, string> | { content: string }
+  /** 已作答耗时(秒) */
+  duration: number
+}
+
+/** 演示用内存进度表(与后端 practice_progress 表语义一致;页面刷新即清空) */
+const practiceProgress = new Map<string, PracticeProgress>()
+
+/** 进度存储键:题型 + 题目 ID */
+function progressKey(type: string, id: string): string {
+  return `${type}/${id}`
+}
+
 export const practiceHandlers = [
   /** 题型来源列表:source 仅接受 real | teacher(任务书 11.1 注);缺省返回全部(12.3) */
   http.get('/api/practice/list', async ({ request }) => {
@@ -172,6 +188,8 @@ export const practiceHandlers = [
       (storesByType[type] as StoredPracticeItem<PracticeType>[]).find((it) => it.id === params.id) ??
       generatedItems.get(String(params.id))
     if (!item) return fail(404, '题目不存在')
+    // 提交即本次作答结束:清除断点续答进度(与后端 PracticeService.submit 行为一致)
+    practiceProgress.delete(progressKey(type, String(params.id)))
 
     const body = (await request.json()) as PracticeSubmitRequest
     const gradingPreference = body.gradingMethod ?? userSettings.gradingMethod
@@ -281,6 +299,25 @@ export const practiceHandlers = [
     ).flat()
     const picked = shuffle(allItems)[0]
     return ok(stripPracticeItem(picked))
+  }),
+
+  /** 读取作答进度(扩展契约 E1;无进度时 data=null) */
+  http.get('/api/practice/detail/:type/:id/progress', async ({ request, params }) => {
+    await delay()
+    if (!currentUser(request)) return fail(401, '未登录或登录已过期', 401)
+    return ok(practiceProgress.get(progressKey(String(params.type), String(params.id))) ?? null)
+  }),
+
+  /** 保存作答进度(扩展契约 E1;覆盖式写入,提交后由上面的 submit 处理器清除) */
+  http.put('/api/practice/detail/:type/:id/progress', async ({ request, params }) => {
+    await delay()
+    if (!currentUser(request)) return fail(401, '未登录或登录已过期', 401)
+    const body = (await request.json()) as PracticeProgress
+    practiceProgress.set(progressKey(String(params.type), String(params.id)), {
+      answers: body.answers,
+      duration: body.duration ?? 0,
+    })
+    return ok(null)
   }),
 ]
 

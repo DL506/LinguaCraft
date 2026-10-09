@@ -27,3 +27,8 @@ export function getVocabTodayTask(): Promise<VocabTodayTask> {
 export function getVocabDue(page: number, size: number): Promise<PageResult<Word>> {
   return get<PageResult<Word>>(`/vocab/task/due?page=${page}&size=${size}`)
 }
+
+/** 查词(扩展契约 E3):阅读页点词查词等场景;词库未收录时返回 null */
+export function lookupWord(word: string): Promise<Word | null> {
+  return get<Word | null>(`/vocab/lookup?word=${encodeURIComponent(word)}`)
+}

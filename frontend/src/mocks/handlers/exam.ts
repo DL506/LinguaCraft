@@ -181,6 +181,19 @@ function buildReport(rec: ExamSubmissionRecord, exam: (typeof examStore)[number]
   return report
 }
 
+/** 模考作答进度载荷(扩展契约 E2:断点续答) */
+interface ExamProgress {
+  /** 客观题作答:答题卡全局编号 -> 答案 */
+  objective: Record<number, string>
+  /** 作文作答(可空) */
+  writing?: { content: string }
+  /** 已作答耗时(秒) */
+  duration: number
+}
+
+/** 演示用内存进度表(与后端 exam_progress 表语义一致;页面刷新即清空) */
+const examProgress = new Map<string, ExamProgress>()
+
 export const examHandlers = [
   /** 模考列表:按年份倒序,支持年份筛选与分页;静态段先于动态段声明(12.4、12.8) */
   http.get('/api/exam/list', async ({ request }) => {
@@ -226,6 +239,8 @@ export const examHandlers = [
     const exam = examStore.find((e) => e.id === params.id)
     if (!exam) return fail(404, '试卷不存在')
     const body = (await request.json()) as ExamSubmitRequest
+    // 交卷即清除本次模考进度(与后端 ExamService.submit 行为一致)
+    examProgress.delete(String(params.id))
     const preference = body.gradingMethod ?? userSettings.gradingMethod
     const { details, objectiveScore, correctCount, sectionScores } = gradeExamObjective(
       exam,
@@ -287,5 +302,25 @@ export const examHandlers = [
     const exam = examStore.find((e) => e.id === rec.examId)
     if (!exam) return fail(404, '试卷不存在')
     return ok(buildReport(rec, exam))
+  }),
+
+  /** 读取模考作答进度(扩展契约 E2;无进度时 data=null) */
+  http.get('/api/exam/:id/progress', async ({ request, params }) => {
+    await delay()
+    if (!currentUser(request)) return fail(401, '未登录或登录已过期', 401)
+    return ok(examProgress.get(String(params.id)) ?? null)
+  }),
+
+  /** 保存模考作答进度(扩展契约 E2;覆盖式写入,交卷后由 submit 处理器清除) */
+  http.put('/api/exam/:id/progress', async ({ request, params }) => {
+    await delay()
+    if (!currentUser(request)) return fail(401, '未登录或登录已过期', 401)
+    const body = (await request.json()) as ExamProgress
+    examProgress.set(String(params.id), {
+      objective: body.objective ?? {},
+      writing: body.writing,
+      duration: body.duration ?? 0,
+    })
+    return ok(null)
   }),
 ]

@@ -260,6 +260,32 @@ public class VocabService {
     }
 
     /**
+     * 查词(GET /api/vocab/lookup?word=):阅读页点词查词、写作页词汇提示等场景使用。
+     *
+     * <p>口径:先剥离除字母、撇号、连字符以外的字符(如句尾逗号、引号),再转小写,与 `vocab_word.spelling` 做大小写无关的
+     * 精确匹配 —— 归一化规则与前端点词完全一致,因此接口不依赖调用方先行清洗。
+     * 不做词形归并(lemmas),因此 “abandoned” 查 “abandon” 会未收录 —— 这是刻意保留的简单语义,
+     * 避免近似匹配带偏学生。词库未收录时返回 null(响应 data 为空),由前端提示“词库未收录”。</p>
+     *
+     * @param word 待查单词(可含大小写)
+     * @return 命中则返回 Word,否则 null
+     */
+    public WordDto lookup(String word) {
+        // 归一化:剥离标点与空白后转小写(与 PassageRenderer 的点词清洗规则保持一致)
+        String clean = word == null ? ""
+                : word.replaceAll("[^A-Za-z'-]", "").toLowerCase(java.util.Locale.ROOT);
+        // 防御:空串与明显异常的长输入直接视为未收录,不拼接进查询条件
+        if (clean.isEmpty() || clean.length() > 100) {
+            return null;
+        }
+        VocabWord hit = wordMapper.selectOne(
+                Wrappers.<VocabWord>lambdaQuery()
+                        .apply("LOWER(spelling) = {0}", clean)
+                        .last("LIMIT 1"));
+        return hit == null ? null : toWordDto(hit);
+    }
+
+    /**
      * 自评到下次复习的间隔天数。
      *
      * @param rating unknown/fuzzy/known

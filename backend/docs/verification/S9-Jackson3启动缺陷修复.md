@@ -106,4 +106,4 @@ $m = "D:\GraduationProject\mysql-8.4.7-winx64\bin\mysql.exe"
 - **构建习惯**:本项目 `target/classes` 可能被 IDE(Eclipse 编译器)写入"带编译错误的占位类",出现"编译通过但运行报 `Unresolved compilation problem`"时,一律用 `.\mvnw.cmd clean compile` 复核。
 - **依赖纪律**:后续新增依赖若带入 `io.swagger.core.v3:swagger-annotations*` 或 Jackson 2 的 databind,需确认与 `swagger.version` / Boot 4 Jackson 3 不冲突(见 `pom.xml` 注释)。
 - **AI 相关接口**(`/api/practice/generate`、`/api/practice/smart`、作文 AI 评分)本轮未联网实测:需配置 `OPENAI_API_KEY` 后按 S4 文档验证;未配置时的降级路径已在 S4/S5 文档说明。
-- 首页两接口(`/api/home/today-tasks`、`/api/home/exam-countdown`)仍缺失,属独立待办(见全量检查报告),不在本轮范围。
+- 首页两接口(`/api/home/today-tasks`、`/api/home/exam-countdown`)当时仍缺失,已于 **A0 联调缺口修复**补齐(见 `A0-联调缺口修复.md`)。

@@ -24,7 +24,8 @@
         <p class="word-pop__phonetic">{{ query.result.phonetic }}</p>
         <p class="word-pop__meaning">{{ query.result.meanings.join(';') }}</p>
       </template>
-      <p v-else class="word-pop__missing">演示词库未收录该词</p>
+      <p v-else-if="query.pending" class="word-pop__missing">查词中…</p>
+      <p v-else class="word-pop__missing">词库未收录该词</p>
     </div>
 
     <!-- 桌面选中句子收藏按钮 -->
@@ -49,7 +50,8 @@
             真题:{{ query.result.realExamSentence }}
           </p>
         </template>
-        <p v-else>演示词库未收录该词</p>
+        <p v-else-if="query?.pending">查词中…</p>
+        <p v-else>词库未收录该词</p>
       </div>
     </n-drawer>
 
@@ -59,10 +61,10 @@
 </template>
 
 <script setup lang="ts">
-// 查词数据:mock 阶段直接匹配内置演示词表(真实词典服务由后端契约提供)
+// 查词数据:走后端词库接口(扩展契约 E3 GET /api/vocab/lookup),不再直连 mock 常量
 import { computed, ref } from 'vue'
 import { NDrawer } from 'naive-ui'
-import { wordStore } from '@/mocks/data/words'
+import { lookupWord } from '@/api/vocab'
 import { useDevice } from '@/composables/useDevice'
 import type { Word } from '@/types/vocab'
 
@@ -86,27 +88,52 @@ const rootEl = ref<HTMLElement | null>(null)
 /** 英文分词:按空白拆分,标点随词尾(查词时剥离) */
 const words = computed(() => props.passage.split(/\s+/).filter(Boolean))
 
-/** 查词状态:word 命中演示词表则带 result */
-const query = ref<{ word: string; x: number; y: number; result?: Word } | null>(null)
+/** 查词结果缓存:小写词形 -> Word 或 null(未收录也缓存,避免反复点同一个词重复请求) */
+const wordCache = new Map<string, Word | null>()
+
+/** 查词请求序号:只接受最后一次点击的响应,避免连续点词时旧响应覆盖新结果 */
+let querySeq = 0
+
+/** 查词状态:pending 为请求中,result 为命中词(缺省表示未收录) */
+const query = ref<{
+  word: string
+  x: number
+  y: number
+  result?: Word
+  pending?: boolean
+} | null>(null)
 /** 手机查词抽屉开关 */
 const mobileDrawerShow = ref(false)
 
-/** 在演示词表中查找单词(剥离标点、忽略大小写) */
-function lookup(raw: string): Word | undefined {
-  const clean = raw.replace(/[^a-zA-Z'-]/g, '').toLowerCase()
-  if (!clean) return undefined
-  return wordStore.find((w) => w.spelling.toLowerCase() === clean)
-}
-
-/** 点词查词:桌面浮动卡,手机底部抽屉 */
+/** 点词查词:桌面浮动卡,手机底部抽屉;先弹出词头与加载态,命中后填充释义 */
 function onWordClick(raw: string, event: MouseEvent): void {
-  const result = lookup(raw)
-  if (isMobile.value) {
-    query.value = { word: raw.replace(/[^a-zA-Z'-]/g, ''), x: 0, y: 0, result }
-    mobileDrawerShow.value = true
-  } else {
-    query.value = { word: raw, x: event.clientX, y: event.clientY, result }
+  const clean = raw.replace(/[^a-zA-Z'-]/g, '').toLowerCase()
+  const base = {
+    // 手机抽屉只展示剥离标点的词形,桌面浮卡保留原样(与改造前一致)
+    word: isMobile.value ? raw.replace(/[^a-zA-Z'-]/g, '') : raw,
+    x: isMobile.value ? 0 : event.clientX,
+    y: isMobile.value ? 0 : event.clientY,
   }
+  const seq = ++querySeq
+  if (isMobile.value) mobileDrawerShow.value = true
+
+  // 无有效字母(纯标点)或缓存已有结果:直接给出,不发请求
+  const cached = clean ? wordCache.get(clean) : undefined
+  if (!clean || cached !== undefined) {
+    query.value = { ...base, result: cached ?? undefined }
+    return
+  }
+
+  query.value = { ...base, pending: true }
+  lookupWord(clean)
+    .then((hit) => {
+      wordCache.set(clean, hit ?? null)
+      if (seq === querySeq) query.value = { ...base, result: hit ?? undefined }
+    })
+    .catch(() => {
+      // 查词失败不打断答题:静默降级为未收录提示
+      if (seq === querySeq) query.value = { ...base }
+    })
 }
 
 /** 选中句子收藏(桌面):选区位于文章内时显示浮动按钮 */

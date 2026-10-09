@@ -4,6 +4,8 @@
 
 - JDK 21
 - 本地 MySQL 8.4.7(默认连接 `127.0.0.1:3306/linguacraft`,`root`;可用环境变量覆盖)
+  - 程序目录 `C:\Users\ASUS\mysql-8.4.7-winx64`;其 `my.ini` 的 `basedir`/`datadir` 仍指向 `D:\GraduationProject\mysql-8.4.7-winx64`,因此**数据目录(含 linguacraft 库)在 D 盘**
+  - Windows 服务 `MySQL` 为 Stopped/Disabled,进 `bin` 直接拉起即可:`.\mysqld.exe --console`
 - 使用仓库自带 Maven wrapper(`mvnw.cmd`),无需单独安装 Maven
 
 ## 数据库初始化(从零)
@@ -56,7 +58,9 @@ cd backend
 - 统一响应 `{code,message,data}`;认证 `Authorization: Bearer <token>`;401 → 前端清 token 跳登录;
 - **答案不下发**:GET 题目/试卷接口不含 answer/explanation;`details` 仅 graded 下发;pending 返回 estimatedTime;
 - 批改状态机:AI 模式即时出分;人工模式先 pending、约 1 分钟后自动流转;写作 AI 全权评分,失败降级转人工;
-- 断点续答(扩展契约):练习 E1 `/api/practice/detail/{type}/{id}/progress`、模考 E2 `/api/exam/{id}/progress`(前端已对接,提交/交卷后自动清除);
+- 断点续答(扩展契约):练习 E1 `/api/practice/detail/{type}/{id}/progress`、模考 E2 `/api/exam/{id}/progress`(前端已对接,提交/交卷后自动清除;MSW 侧已补同名 handler);
+- 查词(扩展契约 E3):`GET /api/vocab/lookup?word=`,大小写无关且自动剥离标点,不做词形归并;未收录返回 `code=0` 且 `data=null`;
+- 首页:`GET /api/home/today-tasks` 的 done 与 `/api/user/stats` 同用 `created_at` 口径,背单词完成数直接复用 `VocabService.todayTask()`;`GET /api/home/exam-countdown` 取配置 `lc.exam.date`/`lc.exam.progress`。
 - 统计口径:`/api/user/stats` 的 `typeAccuracy.grammar` 映射 `grammar-fill`,`sourceAccuracy` 无数据返回 -1。
 - **JSON 栈统一为 Jackson 3**(`tools.jackson.*`,Spring Boot 4 默认):实体主键 `Long` 由 `config/JacksonConfig` 的 `JacksonModule` Bean 全局序列化为字符串(对应前端 `id: string`)。不得再使用 `com.fasterxml.jackson.databind/core` 的类(`com.fasterxml.jackson.annotation` 注解包除外);swagger 注解包版本已在 `pom.xml` 固定为 2.2.52,勿降级。背景见 `docs/verification/S9-Jackson3启动缺陷修复.md`。
 
