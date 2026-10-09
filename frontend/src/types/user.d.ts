@@ -1,6 +1,9 @@
 // 个人中心域类型:资料、统计、设置、提交记录、错题、收藏(任务书 11.8-11.10、12.7)
 import type { GradingStatus, PracticeType, QuestionSource } from './practice'
 
+/** 用户角色:后台入口与路由守卫依据(扩展契约,后端 V08 新增列) */
+export type UserRole = 'student' | 'admin'
+
 /** 用户资料(12.7) */
 export interface UserProfile {
   id: string
@@ -15,6 +18,8 @@ export interface UserProfile {
   continuousDays: number
   /** 累计学习天数 */
   totalStudyDays: number
+  /** 角色:仅 admin 可见并可进入 /admin;旧 mock 缺省时视为 student */
+  role?: UserRole
 }
 
 /** 学习统计(12.7) */

@@ -10,6 +10,7 @@ import {
   PersonOutline,
   ReaderOutline,
   SchoolOutline,
+  SettingsOutline,
   TrophyOutline,
 } from '@vicons/ionicons5'
 
@@ -25,6 +26,7 @@ export const navIconMap: Record<string, Component> = {
   BookOutline,
   SchoolOutline,
   PersonOutline,
+  SettingsOutline,
 }
 
 /** 二级菜单项 */
@@ -81,6 +83,21 @@ export const navConfig: NavItem[] = [
   },
 ]
 
+/**
+ * 后台管理端导航(不属于任务书学生端导航体系):仅 isAdmin 时出现在顶部一级导航。
+ *
+ * <p>子项随阶段逐次补齐:A1 只有运营概览;A2 加题库管理;A3 加词书/单词/语法/试卷;
+ * A4 加批改工作台;A5 加用户管理。不先放入未实现的入口,避免点了落到兼容重定向。</p>
+ */
+export const adminNav: NavItem = {
+  key: 'admin',
+  label: '管理',
+  icon: 'SettingsOutline',
+  children: [
+    { key: '/admin/overview', label: '运营概览', icon: 'HomeOutline' },
+  ],
+}
+
 /** 手机底部 Tab:首页 + 三个一级导航(任务书 6.2:手机底部一级 Tab) */
 export const mobileTabs = [
   { key: 'home', label: '首页', path: '/dashboard', icon: 'HomeOutline' },
@@ -89,8 +106,8 @@ export const mobileTabs = [
   { key: 'user', label: '我的', path: '/user/stats', icon: 'PersonOutline' },
 ]
 
-/** 根据 section 取对应一级菜单的子项(二级导航复用) */
+/** 根据 section 取对应一级菜单的子项(二级导航复用;含后台 admin 段) */
 export function childrenOfSection(section: string | undefined) {
-  const parent = navConfig.find((item) => item.key === section)
+  const parent = [...navConfig, adminNav].find((item) => item.key === section)
   return parent?.children ?? []
 }

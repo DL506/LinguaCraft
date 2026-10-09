@@ -35,7 +35,7 @@ import AppLogo from '@/components/common/AppLogo.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { navConfig, navIconMap } from '@/router/nav'
+import { adminNav, navConfig, navIconMap } from '@/router/nav'
 import { clearToken } from '@/utils/storage'
 
 defineProps<{ isTablet?: boolean }>()
@@ -51,9 +51,12 @@ const avatarText = computed(() => (userStore.nickname ? userStore.nickname[0] : 
 /** 当前高亮的一级菜单 key */
 const activeSection = computed(() => (route.meta.section as string | undefined) ?? null)
 
+/** 一级菜单集合:管理员额外可见「管理」入口(可见性仅此一处控制;真正的边界是路由守卫与后端 403) */
+const topLevel = computed(() => (userStore.isAdmin ? [...navConfig, adminNav] : navConfig))
+
 /** 一级菜单选项(点击进入该一级下的首个页面) */
 const menuOptions = computed<MenuOption[]>(() =>
-  navConfig.map((item) => ({
+  topLevel.value.map((item) => ({
     key: item.key,
     label: item.label,
     icon: () => h(NIcon, null, { default: () => h(navIconMap[item.icon]) }),
@@ -62,21 +65,25 @@ const menuOptions = computed<MenuOption[]>(() =>
 
 /** 一级菜单点击:进入该一级下的首个页面 */
 function onMenuSelect(key: string): void {
-  const parent = navConfig.find((item) => item.key === key)
+  const parent = topLevel.value.find((item) => item.key === key)
   if (parent?.children?.[0]) router.push(parent.children[0].key)
 }
 
-/** 头像下拉菜单 */
+/** 头像下拉菜单:管理员多一项「进入后台」 */
 const userOptions = computed<MenuOption[]>(() => [
   { key: 'stats', label: '学习统计' },
   { key: 'settings', label: '设置' },
+  ...(userStore.isAdmin
+    ? ([{ key: 'admin', label: '进入后台' }, { key: 'divider2', type: 'divider' }] as MenuOption[])
+    : []),
   { key: 'divider', type: 'divider' },
-  { key: 'logout', label: '退出登录' },
+  { key: 'logout', label: '退出登录' } as MenuOption,
 ])
 
 function onUserSelect(key: string): void {
   if (key === 'stats') router.push('/user/stats')
   else if (key === 'settings') router.push('/user/settings')
+  else if (key === 'admin') router.push('/admin/overview')
   else if (key === 'logout') {
     clearToken()
     router.push('/login')

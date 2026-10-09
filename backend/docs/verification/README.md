@@ -14,13 +14,15 @@
 | S8 联调收尾与全量验收 | [S8-联调收尾.md](S8-联调收尾.md) | (无) |
 | S9 Jackson 3 迁移与启动缺陷修复 | [S9-Jackson3启动缺陷修复.md](S9-Jackson3启动缺陷修复.md) | (无) |
 | A0 联调缺口修复(首页两接口 + E1/E2 mock + E3 查词) | [A0-联调缺口修复.md](A0-联调缺口修复.md) | (无) |
+| A1 后台权限与账号基座 | [A1-后台权限与账号基座.md](A1-后台权限与账号基座.md) | V08 / S07 |
 
 ## 通用前置
 
-- 本地 MySQL 8.4.7 已启动(Windows 服务 `MySQL`;若未启动需以管理员执行 `net start MySQL`)。
+- 本地 MySQL 8.4.7 已启动。程序目录 `C:\Users\ASUS\mysql-8.4.7-winx64`(其 my.ini 的 basedir/datadir 仍指向 D 盘,数据在 D 盘);Windows 服务 `MySQL` 为 Stopped/Disabled,启动方式:进 `bin` 执行 `.\mysqld.exe --console`。
 - 后端启动:`cd backend` → `.\mvnw.cmd spring-boot:run`(端口 8080)。
 - 编译复核一律带 `clean`(`.\mvnw.cmd clean compile`):IDE 的 Eclipse 编译器可能把"带编译错误的占位类"写进 `target/classes`,普通增量编译会误判为最新(详见 S9 缺陷 3)。
 - 前端启动:`cd frontend` → `npm run dev`(端口 5173)。
 - 联调关闭 MSW:`frontend/.env.development.local` 写入 `VITE_USE_MOCK=false`(该文件不入库)。
 - 接口调试入口:Swagger UI `http://localhost:8080/swagger-ui.html`(先调登录接口,再把 token 填入 Authorize)。
 - 演示账号:`demo / 123456`(重跑 `S01__seed_demo_user.sql` 可重置演示账号状态)。
+- 后台管理员:`admin / 123456`(重跑 `S07__seed_admin_account.sql` 可重置为 admin/enabled=1)。

@@ -1,6 +1,6 @@
 // 用户 store:登录态、昵称、资料缓存与登出(配合 api/auth 与 api/user)
 // token 持久化由 storage + api 层负责;本 store 只维护内存态并供全局响应式使用
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { clearToken, getToken } from '@/utils/storage'
 import { getUserProfile } from '@/api/user'
@@ -36,5 +36,19 @@ export const useUserStore = defineStore('user', () => {
     isLoggedIn.value = false
   }
 
-  return { nickname, profile, isLoggedIn, setAuth, fetchProfile, logout }
+  /** 是否管理员(后台入口显隐与 /admin 路由守卫依据;资料未加载时为 false) */
+  const isAdmin = computed(() => profile.value?.role === 'admin')
+
+  /** 确保资料已加载(供路由守卫使用)
+   *  失败时返回 null 而非抛异常,避免令牌失效时导航被中断(401 已由 request 层统一跳登录) */
+  async function ensureProfile(): Promise<UserProfile | null> {
+    if (profile.value) return profile.value
+    try {
+      return await fetchProfile()
+    } catch {
+      return null
+    }
+  }
+
+  return { nickname, profile, isLoggedIn, isAdmin, setAuth, fetchProfile, ensureProfile, logout }
 })

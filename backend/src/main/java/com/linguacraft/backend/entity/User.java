@@ -12,10 +12,20 @@ import java.time.LocalDateTime;
  *
  * <p>对外序列化说明:主键 id 为包装类型 Long,经全局 Jackson 配置序列化为字符串,
  * 满足前端契约中 id 为 string 的约定。</p>
+ *
+ * <p>权限说明(V08 新增列):{@code role} 为 student/admin 单角色模型,
+ * 登录时写入 JWT 的 role 声明并由 {@code JwtAuthFilter} 转成 Spring Security 权限;
+ * {@code enabled} 为启用状态,停用账号在登录环节即被拒绝。</p>
  */
 @Data
 @TableName("`user`")
 public class User {
+
+    /** 角色:学生端(默认) */
+    public static final String ROLE_STUDENT = "student";
+
+    /** 角色:后台管理员 */
+    public static final String ROLE_ADMIN = "admin";
 
     /** 主键(自增) */
     @TableId(type = IdType.AUTO)
@@ -32,6 +42,12 @@ public class User {
 
     /** 邮箱(唯一,用于找回密码) */
     private String email;
+
+    /** 角色:student 学生 / admin 管理员(V08) */
+    private String role;
+
+    /** 启用状态:true 启用,false 停用(停用后禁止登录,V08) */
+    private Boolean enabled;
 
     /** 头像地址(可空) */
     private String avatar;

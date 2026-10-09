@@ -67,11 +67,11 @@ public class AuthService {
     }
 
     /**
-     * 登录:校验用户名与密码,成功签发 JWT。
+     * 登录:校验用户名与密码、启用状态,成功签发含角色的 JWT。
      *
      * @param request 登录请求
      * @return 令牌与用户信息
-     * @throws BizException 用户名不存在或密码错误(code 1001)
+     * @throws BizException 用户名不存在或密码错误(code 1001);账号已停用(code 1001 专用文案)
      */
     public AuthResult login(LoginRequest request) {
         User user = userMapper.selectOne(
@@ -79,6 +79,11 @@ public class AuthService {
         String password = request.getPassword();
         if (user == null || password == null || !passwordEncoder.matches(password, user.getPassword())) {
             throw new BizException(ResultCode.LOGIN_FAILED);
+        }
+        // 停用账号不得登录(管理端可在用户管理页停用);
+        // 注意：不区分“密码错误”与“账号不存在”,避免账号枚举
+        if (Boolean.FALSE.equals(user.getEnabled())) {
+            throw new BizException(ResultCode.LOGIN_FAILED.getCode(), "账号已停用,请联系管理员");
         }
         return buildAuthResult(user);
     }
@@ -103,6 +108,9 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
         user.setEmail(request.getEmail());
+        // 安全约束:注册链路一律写死 student,管理员只能由种子脚本或管理端角色接口产生
+        user.setRole(User.ROLE_STUDENT);
+        user.setEnabled(true);
         try {
             userMapper.insert(user);
         } catch (DuplicateKeyException e) {
@@ -170,8 +178,11 @@ public class AuthService {
      * @return 认证响应
      */
     private AuthResult buildAuthResult(User user) {
+        // role 为空时按 student 兜底(防历史脏数据导致无法登录后台也无法当学生用)
+        String role = user.getRole() == null || user.getRole().isBlank()
+                ? User.ROLE_STUDENT : user.getRole();
         return AuthResult.builder()
-                .token(jwtUtil.generateToken(user.getId(), user.getUsername()))
+                .token(jwtUtil.generateToken(user.getId(), user.getUsername(), role))
                 .expiresIn(jwtUtil.getExpireSeconds())
                 .user(AuthUser.builder()
                         .id(user.getId())

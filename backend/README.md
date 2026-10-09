@@ -15,7 +15,7 @@
 执行顺序:
 
 ```
-V01 → V02 → S01 → V03 → S02 → V05 → S03 → V06 → S04 → S05 → V07 → S06
+V01 → V02 → S01 → V03 → S02 → V05 → S03 → V06 → S04 → S05 → V07 → S06 → V08 → S07
 ```
 
 PowerShell 示例(必须使用长选项,短选项 `-h` 在 PowerShell 下会被错误解析):
@@ -40,6 +40,7 @@ cd backend
 - Swagger UI:`http://localhost:8080/swagger-ui.html`
 - 健康检查:`http://localhost:8080/actuator/health`
 - 演示账号:`demo / 123456`(S01 种子;**重复执行 S01 会把 demo 重置为初始状态**)
+- 后台管理员:`admin / 123456`(S07 种子;仅能登录后台 `/api/admin/**`,学生端接口也可用。**本地演示口令,对外环境必须改密**)
 
 ## 环境变量(均可选,覆盖 application.yml 默认值)
 
@@ -62,6 +63,9 @@ cd backend
 - 查词(扩展契约 E3):`GET /api/vocab/lookup?word=`,大小写无关且自动剥离标点,不做词形归并;未收录返回 `code=0` 且 `data=null`;
 - 首页:`GET /api/home/today-tasks` 的 done 与 `/api/user/stats` 同用 `created_at` 口径,背单词完成数直接复用 `VocabService.todayTask()`;`GET /api/home/exam-countdown` 取配置 `lc.exam.date`/`lc.exam.progress`。
 - 统计口径:`/api/user/stats` 的 `typeAccuracy.grammar` 映射 `grammar-fill`,`sourceAccuracy` 无数据返回 -1。
+- 权限(阶段 A1 起):`user.role` 单角色模型(student/admin),JWT 携带 role 声明并映射为 `ROLE_ADMIN`/`ROLE_STUDENT`;`/api/admin/**` 要求管理员角色。
+  未登录 → HTTP 401 + `code:401`(前端清 token 跳登录);已登录但角色不足 → HTTP 403 + `code:403`(仅提示,不清 token);
+  注册链路强制 `role=student`,停用(`enabled=0`)账号在登录环节被拒。
 - **JSON 栈统一为 Jackson 3**(`tools.jackson.*`,Spring Boot 4 默认):实体主键 `Long` 由 `config/JacksonConfig` 的 `JacksonModule` Bean 全局序列化为字符串(对应前端 `id: string`)。不得再使用 `com.fasterxml.jackson.databind/core` 的类(`com.fasterxml.jackson.annotation` 注解包除外);swagger 注解包版本已在 `pom.xml` 固定为 2.2.52,勿降级。背景见 `docs/verification/S9-Jackson3启动缺陷修复.md`。
 
 ## 目录速览

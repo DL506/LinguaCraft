@@ -12,6 +12,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
  */
 public final class SecurityUtils {
 
+    /** Spring Security 角色权限前缀 */
+    private static final String ROLE_PREFIX = "ROLE_";
+
     private SecurityUtils() {
     }
 
@@ -27,5 +30,27 @@ public final class SecurityUtils {
             return userId;
         }
         throw new BizException(ResultCode.UNAUTHORIZED);
+    }
+
+    /**
+     * 获取当前登录用户的角色(来自 JWT 声明转换的权限)。
+     *
+     * <p>权限名带 Spring Security 的 {@code ROLE_} 前缀,本方法去掉前缀后返回
+     * 小写形式(student/admin),以便与管理端接口响应体里的 {@code role} 字段保持一致口径。</p>
+     *
+     * @return 角色字符串;未认证或无角色权限时返回 student(安全兜底,不提升权限)
+     */
+    public static String getCurrentRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return com.linguacraft.backend.entity.User.ROLE_STUDENT;
+        }
+        for (org.springframework.security.core.GrantedAuthority authority : authentication.getAuthorities()) {
+            String name = authority.getAuthority();
+            if (name != null && name.startsWith(ROLE_PREFIX)) {
+                return name.substring(ROLE_PREFIX.length()).toLowerCase(java.util.Locale.ROOT);
+            }
+        }
+        return com.linguacraft.backend.entity.User.ROLE_STUDENT;
     }
 }

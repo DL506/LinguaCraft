@@ -8,6 +8,9 @@ import lombok.NoArgsConstructor;
 
 /**
  * 用户资料响应(GET /api/user/profile,对应前端 UserProfile)。
+ *
+ * <p>{@code role} 为后台入口判定依据(仅 admin 可进入 /admin);
+ * 默认 student,旧前端读到额外字段不会受影响。</p>
  */
 @Data
 @Builder
@@ -46,4 +49,8 @@ public class UserProfileResponse {
     /** 累计学习天数 */
     @Schema(description = "累计学习天数", example = "128")
     private Integer totalStudyDays;
+
+    /** 角色:student 学生 / admin 管理员(前端据此显示后台入口并做路由守卫) */
+    @Schema(description = "角色:student/admin", example = "admin")
+    private String role;
 }

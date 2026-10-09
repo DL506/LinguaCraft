@@ -13,6 +13,8 @@ declare module 'vue-router' {
     immersive?: boolean
     /** 是否公开页(免登录,守卫放行) */
     public?: boolean
+    /** 是否仅管理员可进(守卫校验 profile.role;后端 /api/admin/** 另有 403 双重保险) */
+    adminOnly?: boolean
   }
 }
 
@@ -102,6 +104,20 @@ export const routes: RouteRecordRaw[] = [
           { path: 'favorites', component: () => import('@/views/user/Favorites.vue'), meta: { title: '收藏', section: 'user' } },
           { path: 'settings', component: () => import('@/views/user/Settings.vue'), meta: { title: '设置', section: 'user' } },
         ],
+      },
+    ],
+  },
+  {
+    // 后台管理端(阶段 A1~A5 逐次填充):独立 AdminLayout,与学生端导航完全隔离
+    path: '/admin',
+    component: () => import('@/layouts/AdminLayout.vue'),
+    redirect: '/admin/overview',
+    meta: { adminOnly: true, section: 'admin' },
+    children: [
+      {
+        path: 'overview',
+        component: () => import('@/views/admin/Overview.vue'),
+        meta: { title: '运营概览', section: 'admin' },
       },
     ],
   },

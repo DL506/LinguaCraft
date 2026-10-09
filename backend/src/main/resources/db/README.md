@@ -13,6 +13,12 @@
 ## 执行方式(PowerShell 必须使用长选项)
 
 ```powershell
+# 仍推荐用字节安全的重定向方式(避免 PowerShell 管道对中文的编码改写):
+# 不入库的临时做法——直接把脚本喂给 mysql 客户端
+Start-Process -FilePath "$env:USERPROFILE\mysql-8.4.7-winx64\bin\mysql.exe" `
+  -ArgumentList '--host=127.0.0.1','--port=3306','--user=root','--password=<你的密码>','--default-character-set=utf8mb4','linguacraft' `
+  -RedirectStandardInput .\backend\src\main\resources\db\V08__add_user_role_and_enabled.sql -NoNewWindow -Wait
+
 # 建库脚本(V01,此时库尚不存在,不能传 --database)
 Get-Content .\backend\src\main\resources\db\V01__create_database.sql -Raw |
   mysql --host=127.0.0.1 --port=3306 --user=root --password=<你的密码> --default-character-set=utf8mb4
@@ -40,5 +46,7 @@ Get-Content .\backend\src\main\resources\db\V02__create_user_auth_tables.sql -Ra
 | S05 | S05__seed_grammar.sql | 语法目录 18 节点 + 12 章节 markdown(grammar-tree 迁移) | V06 | 是 | 已执行 |
 | V07 | V07__create_favorite_table.sql | favorite 收藏表 | V01 | 是 | 已执行 |
 | S06 | S06__seed_demo_history.sql | 演示历史数据(demo:提交 3/错题 2/收藏 2/词进度 3/复习日志 2) | V03/V06/V07 | 是 | 已执行 |
+| V08 | V08__add_user_role_and_enabled.sql | user 表加 `role`(student/admin)与 `enabled` 两列 + `idx_user_role`(information_schema 判重 + PREPARE 实现幂等) | V02 | 是 | 已执行 |
+| S07 | S07__seed_admin_account.sql | 后台管理员账号 admin/123456(role=admin)及其默认设置 | V02/V08 | 是 | 已执行 |
 
 > 后续步骤新增的 V/S 脚本将在此表按序追加。

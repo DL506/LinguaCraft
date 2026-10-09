@@ -20,6 +20,9 @@ public enum ResultCode {
     /** 未登录或登录已过期(前端收到后清 token 跳登录页) */
     UNAUTHORIZED(401, "未登录或登录已过期"),
 
+    /** 已登录但权限不足(如学生令牌访问 /api/admin/**;前端提示后留在当前页) */
+    FORBIDDEN(403, "无权限访问"),
+
     /** 资源不存在 */
     NOT_FOUND(404, "资源不存在"),
 

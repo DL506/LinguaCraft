@@ -18,10 +18,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
- * Spring Security 配置:无状态 JWT 认证。
+ * Spring Security 配置:无状态 JWT 认证 + 单角色授权。
  *
  * <p>放行范围:/api/auth/**(登录注册等)、/api/system/**(冒烟)、swagger 与 actuator;
  * 其余接口必须携带有效 Bearer 令牌,未认证统一返回 HTTP 401 + code 401。</p>
+ *
+ * <p>后台权限:/api/admin/** 除认证外还要求 {@code hasRole("ADMIN")}(角色由 JWT 声明经
+ * {@link JwtAuthFilter} 转为 ROLE_ADMIN);已登录但角色不足时由
+ * {@link RestAccessDeniedHandler} 统一返回 HTTP 403 + code 403。</p>
  */
 @Configuration
 @EnableWebSecurity
@@ -29,10 +33,14 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final RestAuthEntryPoint restAuthEntryPoint;
+    private final RestAccessDeniedHandler restAccessDeniedHandler;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, RestAuthEntryPoint restAuthEntryPoint) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter,
+                          RestAuthEntryPoint restAuthEntryPoint,
+                          RestAccessDeniedHandler restAccessDeniedHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.restAuthEntryPoint = restAuthEntryPoint;
+        this.restAccessDeniedHandler = restAccessDeniedHandler;
     }
 
     /**
@@ -52,8 +60,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/api/system/**",
                                 "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
                                 "/actuator/**").permitAll()
+                        // 后台接口:必须为管理员角色(匹配顺序必须在 anyRequest 之前)
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
-                .exceptionHandling(handler -> handler.authenticationEntryPoint(restAuthEntryPoint))
+                .exceptionHandling(handler -> handler
+                        .authenticationEntryPoint(restAuthEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

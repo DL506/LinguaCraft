@@ -27,7 +27,7 @@ export const userSettings: UserSettings = {
   reminderTime: '08:00',
 }
 
-/** 用户资料(静态演示值) */
+/** 用户资料(静态演示值;role 与后端 /api/user/profile 新字段保持一致,演示账号为学生端) */
 export const userProfile: UserProfile = {
   id: 'u-demo',
   username: 'demo',
@@ -36,6 +36,7 @@ export const userProfile: UserProfile = {
   levelName: '青铜学习者',
   continuousDays: 21,
   totalStudyDays: 128,
+  role: 'student',
 }
 
 /** 提交记录内部结构(练习单题与模考共用;模考走 exam.ts 的 examSubmissions) */

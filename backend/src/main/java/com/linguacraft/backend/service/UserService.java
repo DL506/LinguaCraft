@@ -115,6 +115,9 @@ public class UserService {
                 .levelName(user.getLevelName())
                 .continuousDays(user.getContinuousDays())
                 .totalStudyDays(user.getTotalStudyDays())
+                // 角色取库内权威值(不信令牌),缺失时按 student 兜底
+                .role(user.getRole() == null || user.getRole().isBlank()
+                        ? User.ROLE_STUDENT : user.getRole())
                 .build();
     }
 

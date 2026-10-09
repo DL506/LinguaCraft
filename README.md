@@ -10,10 +10,10 @@
 
 ## 后端快速开始(详细见 backend/README.md)
 
-1. 启动本地 MySQL(Windows 服务 `MySQL`;未启动时以管理员执行 `net start MySQL`);
+1. 启动本地 MySQL 8.4.7(程序目录 `C:\Users\ASUS\mysql-8.4.7-winx64`,进 `bin` 执行 `.\mysqld.exe --console`;Windows 服务 `MySQL` 默认未启用);
 2. 按顺序执行建库与种子脚本(全量清单与命令见 `backend/src/main/resources/db/README.md`);
 3. 启动后端:`cd backend` → `.\mvnw.cmd spring-boot:run`(端口 8080;Swagger UI `/swagger-ui.html`);
-4. 演示账号:`demo / 123456`。
+4. 账号:学生端 `demo / 123456`;后台管理端 `admin / 123456`(登录后访问 `/admin`,仅管理员可进入;`/api/admin/**` 后端同时做 403 校验)。
 
 AI 能力(AI 出题/作文评分)需配置 `LC_AI_API_KEY / LC_AI_BASE_URL / LC_AI_MODEL`;未配置时按降级路径运行(作文转人工 pending、出题返回可重试错误)。
 
