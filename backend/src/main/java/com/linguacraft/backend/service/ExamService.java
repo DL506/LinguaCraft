@@ -246,13 +246,17 @@ public class ExamService {
     /**
      * 成绩报告(GET /api/exam/submission/{submissionId}/report)。
      *
+     * <p>只允许提交本人读取:报告含得分与逐卷明细,越权读他人成绩属于信息泄露,
+     * 因此归属不符与不存在一律回 404(不区分,避免用错误码探测提交是否存在)。
+     * 口径与学生端「我的提交」详情 {@code UserService.submissionDetail} 一致。</p>
+     *
      * @param submissionId 提交记录 ID(字符串)
      * @return 成绩报告(含各 section 得分/薄弱项/历年对比)
      */
     public ExamReportDto report(String submissionId) {
         Long id = parseId(submissionId);
         ExamSubmission submission = submissionMapper.selectById(id);
-        if (submission == null) {
+        if (submission == null || !SecurityUtils.getCurrentUserId().equals(submission.getUserId())) {
             throw new BizException(ResultCode.NOT_FOUND.getCode(), "提交记录不存在");
         }
         ExamPaper paper = findPaper(submission.getExamId());
