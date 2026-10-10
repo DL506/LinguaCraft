@@ -23,6 +23,8 @@
 - 后端启动:`cd backend` → `.\mvnw.cmd spring-boot:run`(端口 8080)。
 - 编译复核一律带 `clean`(`.\mvnw.cmd clean compile`):IDE 的 Eclipse 编译器可能把"带编译错误的占位类"写进 `target/classes`,普通增量编译会误判为最新(详见 S9 缺陷 3)。
 - 前端启动:`cd frontend` → `npm run dev`(端口 5173)。
+- 端口被本机其他项目占用时:`frontend/.env.development.local`(不入库)里设 `VITE_PORT=5174` 与 `VITE_PROXY_TARGET=http://localhost:8081`,
+  后端相应以 `.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments=--server.port=8081` 启动;`vite.config.ts` 会读这两个变量,无需改仓库配置。
 - 联调关闭 MSW:`frontend/.env.development.local` 写入 `VITE_USE_MOCK=false`(该文件不入库)。
 - 接口调试入口:Swagger UI `http://localhost:8080/swagger-ui.html`(先调登录接口,再把 token 填入 Authorize)。
 - 演示账号:`demo / 123456`(重跑 `S01__seed_demo_user.sql` 可重置演示账号状态)。
