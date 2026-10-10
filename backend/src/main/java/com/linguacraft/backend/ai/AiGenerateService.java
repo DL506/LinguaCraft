@@ -10,6 +10,7 @@ import com.linguacraft.backend.dto.practice.PracticeItemResponse;
 import com.linguacraft.backend.dto.practice.SourceDto;
 import com.linguacraft.backend.entity.Question;
 import com.linguacraft.backend.mapper.QuestionMapper;
+import com.linguacraft.backend.service.QuestionContentValidator;
 import com.linguacraft.backend.util.PracticeRules;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +25,9 @@ import java.util.List;
 /**
  * AI 出题服务(Spring AI):点即生成、无参数面板(任务书 10.6)。
  *
- * <p>流程:调用模型 → 结构校验(失败重试一次)→ 拆分"下发内容 / 答案"双 JSON
- * → 持久化到题库(source=ai,题目可被详情/提交/错题重做全链路复用)→ 返回 ForAnswer。</p>
+ * <p>流程:调用模型 → 字段结构校验 → 拆分"下发内容 / 答案"双 JSON → 五道入库校验(与后台题目录入
+ * 共用 {@link QuestionContentValidator})→ 持久化到题库(source=ai,题目可被详情/提交/错题重做全链路复用)
+ * → 返回 ForAnswer。任一步不合格都<b>不落库</b>,带原因重试一次,仍失败则返回可重试错误。</p>
  */
 @Service
 public class AiGenerateService {
@@ -38,15 +40,30 @@ public class AiGenerateService {
     private final AiChatService aiChatService;
     private final QuestionMapper questionMapper;
     private final ObjectMapper objectMapper;
+    private final QuestionContentValidator questionContentValidator;
 
     /** 生成模型名(写入 source.meta.model) */
     @Value("${spring.ai.openai.chat.options.model:fake-model}")
     private String modelName;
 
-    public AiGenerateService(AiChatService aiChatService, QuestionMapper questionMapper, ObjectMapper objectMapper) {
+    public AiGenerateService(AiChatService aiChatService,
+                             QuestionMapper questionMapper,
+                             ObjectMapper objectMapper,
+                             QuestionContentValidator questionContentValidator) {
         this.aiChatService = aiChatService;
         this.questionMapper = questionMapper;
         this.objectMapper = objectMapper;
+        this.questionContentValidator = questionContentValidator;
+    }
+
+    /**
+     * 通过五道校验的题草稿。
+     *
+     * @param raw       模型原始返回(标题/难度/标签仍从这里取)
+     * @param content   下发内容(不含答案)
+     * @param answerKey 答案与解析
+     */
+    private record Draft(JsonNode raw, ObjectNode content, ObjectNode answerKey) {
     }
 
     /**
@@ -60,25 +77,28 @@ public class AiGenerateService {
         if (!PracticeRules.isValidType(type)) {
             throw new BizException(ResultCode.TYPE_INVALID);
         }
-        JsonNode json = callWithRetry(type);
-        Question question = buildAndPersist(type, json);
+        Question question = buildAndPersist(type, callWithRetry(type));
         log.info("AI 出题完成: id={} type={} title={}", question.getId(), type, question.getTitle());
         return toResponse(question);
     }
 
     /**
-     * 调用模型并做结构校验;失败重试,最终失败抛可重试错误。
+     * 调用模型并过五道校验闸门;不合格则回喂原因重试,最终失败抛可重试错误。
+     *
+     * <p>闸门与后台题目录入(A2)共用 {@link QuestionContentValidator},因此"AI 生成的题"
+     * 与"人工录入的题"入库标准一致:占位符与空位编号不齐、答案不在候选项内等缺陷
+     * 不会静默落库成脏题。</p>
      *
      * @param type 题型
-     * @return 通过校验的 JSON
+     * @return 通过校验的草稿
      */
-    private JsonNode callWithRetry(String type) {
+    private Draft callWithRetry(String type) {
         BizException lastError = null;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
                 JsonNode json = aiChatService.chatForJson(PromptTemplates.generatePrompt(type));
                 validateStructure(json, type);
-                return json;
+                return buildDraft(type, json);
             } catch (BizException e) {
                 lastError = e;
                 log.warn("AI 出题第 {} 次尝试失败: {}", attempt, e.getMessage());
@@ -86,6 +106,26 @@ public class AiGenerateService {
         }
         throw lastError != null ? lastError
                 : new BizException(ResultCode.SERVER_ERROR.getCode(), "AI 出题失败,请重试");
+    }
+
+    /**
+     * 拆分双 JSON 列并执行五道校验(只判定,不覆写权威字段)。
+     *
+     * @param type 题型
+     * @param json 模型返回
+     * @return 已通过校验的草稿
+     */
+    private Draft buildDraft(String type, JsonNode json) {
+        ObjectNode content = objectMapper.createObjectNode();
+        ObjectNode answerKey = objectMapper.createObjectNode();
+        buildContentByType(type, json, content, answerKey);
+        try {
+            questionContentValidator.validate(type, content, answerKey);
+        } catch (BizException e) {
+            // 换成可重试语义:校验器抛的是 400(面向录入),但模型产出缺陷应当重试而不是让前端当作参数错误
+            throw new BizException(ResultCode.SERVER_ERROR.getCode(), "AI 出题结果不合格:" + e.getMessage());
+        }
+        return new Draft(json, content, answerKey);
     }
 
     /**
@@ -169,11 +209,14 @@ public class AiGenerateService {
     /**
      * 构建题目实体并持久化(拆分双 JSON 列)。
      *
-     * @param type 题型
-     * @param json 已通过校验的 AI 返回
+     * <p>入参草稿已通过五道校验,此处只补权威字段(id/type/source)与分值。</p>
+     *
+     * @param type  题型
+     * @param draft 已通过校验的草稿
      * @return 题目实体
      */
-    private Question buildAndPersist(String type, JsonNode json) {
+    private Question buildAndPersist(String type, Draft draft) {
+        JsonNode json = draft.raw();
         String questionId = type + "-ai-" + Long.toString(System.currentTimeMillis(), 36);
 
         // source 节点:{type:"ai", meta:{model, generatedAt}}
@@ -183,13 +226,10 @@ public class AiGenerateService {
         meta.put("model", modelName);
         meta.put("generatedAt", LocalDateTime.now().toString());
 
-        // 下发内容与答案列
-        ObjectNode content = objectMapper.createObjectNode();
+        ObjectNode content = draft.content();
         content.put("id", questionId);
         content.put("type", type);
         content.set("source", source);
-        ObjectNode answerKey = objectMapper.createObjectNode();
-        buildContentByType(type, json, content, answerKey);
 
         Question question = new Question();
         question.setId(questionId);
@@ -205,7 +245,7 @@ public class AiGenerateService {
         question.setDifficulty(Math.max(1, Math.min(5, difficulty)));
         question.setTags(buildTagsJson(json));
         question.setContent(content.toString());
-        question.setAnswerKey(answerKey.toString());
+        question.setAnswerKey(draft.answerKey().toString());
         question.setHasAnswer(!"writing".equals(type));
         question.setTotalScore(PracticeRules.totalScore(type));
         question.setPerQuestionScore(PracticeRules.perQuestionScore(type));

@@ -67,9 +67,13 @@ cd backend
   未登录 → HTTP 401 + `code:401`(前端清 token 跳登录);已登录但角色不足 → HTTP 403 + `code:403`(仅提示,不清 token);
   注册链路强制 `role=student`,停用(`enabled=0`)账号在登录环节被拒。
 - 后台题库(阶段 A2 起):`/api/admin/questions` 提供列表/详情/新建/更新/上下架/删除六个接口,**只有详情接口返回 `answerKey`**。
-  写入前由 `AdminQuestionService` 做五道校验(结构、`content` 递归禁答案类键、`content` 与 `answer_key` 编号集合相等、客观题答案落在候选内、`passage` 的 `[[n]]` 与空位编号一致),
+  写入前由共享组件 **`service/QuestionContentValidator`** 做五道校验(结构、`content` 递归禁答案类键、`content` 与 `answer_key` 编号集合相等、客观题答案落在候选内、`passage` 的 `[[n]]` 与空位编号一致),
   任一不过返回 `code:400` 且 `message` 带定位路径;`content.id/type/source` 与分值(`PracticeRules` 按题型默认映射)一律由服务端覆写,题型创建后不可变更,删除带提交/错题引用保护。
   CORS 的 `allowedMethods` 在 `WebConfig` 与 `SecurityConfig` **两处都要含 PATCH**。背景见 `docs/verification/A2-后台题库管理.md`。
+- AI(阶段 A3 起):出题与判分统一经 `AiChatService`(超时 `lc.ai.timeout-seconds`,失败即 `code=500` 可重试);
+  **AI 出题与后台录入共用 `QuestionContentValidator`**,校验不过不落库,因此不会出现"AI 静默写入脏题"。
+  端点与密钥经环境变量注入(`LC_AI_API_KEY`/`LC_AI_BASE_URL`/`LC_AI_MODEL`,样例 `backend/.env.example`,本地实值放不入库的 `backend/.env.local`);
+  未注入时应用仍启动,但 `config/RuntimeSafetyReporter` 会逐项 WARN,且四个 AI 入口走降级(作文与无答案题转待批改)。背景见 `docs/verification/A3-AI链路加固与出题闸门.md`。
 - **JSON 栈统一为 Jackson 3**(`tools.jackson.*`,Spring Boot 4 默认):实体主键 `Long` 由 `config/JacksonConfig` 的 `JacksonModule` Bean 全局序列化为字符串(对应前端 `id: string`)。不得再使用 `com.fasterxml.jackson.databind/core` 的类(`com.fasterxml.jackson.annotation` 注解包除外);swagger 注解包版本已在 `pom.xml` 固定为 2.2.52,勿降级。背景见 `docs/verification/S9-Jackson3启动缺陷修复.md`。
 
 ## 目录速览

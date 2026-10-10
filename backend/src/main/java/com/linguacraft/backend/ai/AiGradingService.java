@@ -7,11 +7,15 @@ import com.linguacraft.backend.dto.practice.SubmitDetailDto;
 import com.linguacraft.backend.dto.practice.WritingDimensionDto;
 import com.linguacraft.backend.entity.Question;
 import com.linguacraft.backend.service.GradedObjective;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +31,8 @@ import java.util.Map;
 @Service
 public class AiGradingService {
 
+    private static final Logger log = LoggerFactory.getLogger(AiGradingService.class);
+
     private final AiChatService aiChatService;
 
     public AiGradingService(AiChatService aiChatService) {
@@ -36,9 +42,12 @@ public class AiGradingService {
     /**
      * AI 判分客观题(题库无答案场景)。
      *
+     * <p>明细以<b>学生实际作答的题号</b>为准:模型漏答的题号补成"未判定(isCorrect=false)",
+     * 多答的题号忽略。否则学生端逐题表会少行,且 correct_count/total_count 口径错位。</p>
+     *
      * @param question 题目(下发内容作为判分依据)
      * @param answers  用户作答(题号 -> 作答)
-     * @return 判分结果(明细含 AI 给出的正确答案与解析;得分按题型单题分值计算)
+     * @return 判分结果(明细含 AI 给出的正确答案与解析;得分按题型单题分值计算并封顶卷面总分)
      * @throws BizException AI 返回结构异常(code 500,由上层降级转人工)
      */
     public GradedObjective gradeObjective(Question question, Map<Integer, String> answers) {
@@ -48,18 +57,28 @@ public class AiGradingService {
             throw new BizException(ResultCode.SERVER_ERROR.getCode(), "AI 判分结果结构异常");
         }
 
+        // 先把模型给的判定按题号索引,再以学生作答的题号升序逐项落地
+        Map<Integer, JsonNode> gradedById = new HashMap<>();
+        for (JsonNode item : detailsNode) {
+            gradedById.putIfAbsent(item.path("id").asInt(), item);
+        }
+        List<Integer> askedIds = new ArrayList<>(answers.keySet());
+        askedIds.sort(Comparator.naturalOrder());
+
         List<SubmitDetailDto> details = new ArrayList<>();
         int correctCount = 0;
-        for (JsonNode item : detailsNode) {
-            int id = item.path("id").asInt();
-            // 用户作答以请求原文为准(AI 不参与回填)
-            String userAnswer = answers.getOrDefault(id, "");
+        for (Integer id : askedIds) {
+            JsonNode item = gradedById.get(id);
+            if (item == null) {
+                log.warn("AI 判分缺失题号 {},按未正确计入", id);
+            }
             SubmitDetailDto detail = SubmitDetailDto.builder()
                     .id(id)
-                    .userAnswer(userAnswer)
-                    .correctAnswer(item.path("correctAnswer").asText(""))
-                    .isCorrect(item.path("isCorrect").asBoolean(false))
-                    .explanation(item.path("explanation").asText(""))
+                    // 用户作答以请求原文为准(AI 不参与回填)
+                    .userAnswer(answers.getOrDefault(id, ""))
+                    .correctAnswer(item == null ? "" : item.path("correctAnswer").asText(""))
+                    .isCorrect(item != null && item.path("isCorrect").asBoolean(false))
+                    .explanation(item == null ? "AI 未返回该题判定,请转人工复核" : item.path("explanation").asText(""))
                     .build();
             if (Boolean.TRUE.equals(detail.getIsCorrect())) {
                 correctCount++;
@@ -70,6 +89,10 @@ public class AiGradingService {
         BigDecimal perQuestion = question.getPerQuestionScore() == null
                 ? BigDecimal.ONE : question.getPerQuestionScore();
         BigDecimal score = perQuestion.multiply(BigDecimal.valueOf(correctCount)).setScale(1, RoundingMode.HALF_UP);
+        BigDecimal cap = question.getTotalScore();
+        if (cap != null && score.compareTo(cap) > 0) {
+            score = cap.setScale(1, RoundingMode.HALF_UP);
+        }
         return new GradedObjective(details, score, correctCount, details.size());
     }
 
