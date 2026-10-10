@@ -119,6 +119,22 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/Overview.vue'),
         meta: { title: '运营概览', section: 'admin' },
       },
+      {
+        path: 'questions',
+        component: () => import('@/views/admin/Questions.vue'),
+        meta: { title: '题库管理', section: 'admin' },
+      },
+      {
+        // 新建与编辑共用一个页面(有 id 即编辑模式);new 必须排在 :id 之前声明以免被参数路由吃掉
+        path: 'questions/new',
+        component: () => import('@/views/admin/QuestionEdit.vue'),
+        meta: { title: '新建题目', section: 'admin' },
+      },
+      {
+        path: 'questions/edit/:id',
+        component: () => import('@/views/admin/QuestionEdit.vue'),
+        meta: { title: '编辑题目', section: 'admin' },
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

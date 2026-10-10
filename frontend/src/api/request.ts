@@ -61,5 +61,12 @@ export const post = <T>(path: string, data?: unknown) =>
 export const put = <T>(path: string, data: unknown) =>
   request<T>(path, { method: 'PUT', body: JSON.stringify(data) })
 
+/** PATCH:局部更新(如题目上下架) */
+export const patch = <T>(path: string, data?: unknown) =>
+  request<T>(path, {
+    method: 'PATCH',
+    body: data === undefined ? undefined : JSON.stringify(data),
+  })
+
 /** DELETE */
 export const del = <T>(path: string) => request<T>(path, { method: 'DELETE' })

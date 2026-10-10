@@ -95,6 +95,7 @@ export const adminNav: NavItem = {
   icon: 'SettingsOutline',
   children: [
     { key: '/admin/overview', label: '运营概览', icon: 'HomeOutline' },
+    { key: '/admin/questions', label: '题库管理', icon: 'CreateOutline' },
   ],
 }
 

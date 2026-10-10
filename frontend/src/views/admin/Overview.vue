@@ -72,8 +72,8 @@ const error = ref('')
 
 /** 阶段路线图(与 docs/verification 的 A 系列文档一一对应) */
 const roadmap = [
-  { phase: 'A1', title: '权限与账号基座(role/enabled、403 统一响应、后台布局与守卫)', status: '本阶段' },
-  { phase: 'A2', title: '题库管理(增删改查、上下架、答案防呆校验)', status: '待交付' },
+  { phase: 'A1', title: '权限与账号基座(role/enabled、403 统一响应、后台布局与守卫)', status: '已交付' },
+  { phase: 'A2', title: '题库管理(增删改查、上下架、答案防呆校验)', status: '本阶段' },
   { phase: 'A3', title: '词书 / 单词(含批量导入)/ 语法 / 真题卷管理', status: '待交付' },
   { phase: 'A4', title: '人工批改工作台(闭掉"等真人改"的断链)', status: '待交付' },
   { phase: 'A5', title: '运营看板与用户管理(停用、角色调整)', status: '待交付' },
