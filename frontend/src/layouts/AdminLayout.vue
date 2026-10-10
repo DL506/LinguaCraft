@@ -6,7 +6,10 @@
   >
     <n-message-provider>
       <n-layout position="absolute">
-        <n-layout-header bordered class="admin-header">
+        <!-- 高度必须写死 56px(与学生端 AppLayout 一致):
+             header 与下方 has-sider 布局是上下堆叠的兄弟块,百分比会拿整屏高度当基数 ——
+             100% 会让 header 吃掉全屏,10% 则与下方 calc(100% - 56px) 相加溢出 -->
+        <n-layout-header bordered class="admin-header" style="height: 56px">
           <div class="admin-header__brand">
             <AppLogo />
             <n-tag size="small" type="info" :bordered="false">管理后台</n-tag>
@@ -134,7 +137,7 @@ function onUserSelect(key: string): void {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 100%;
+  /* 高度由模板内联 style 固定为 56px,这里不再声明 height */
   padding: 0 24px;
 }
 
