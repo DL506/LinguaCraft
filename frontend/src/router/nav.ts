@@ -2,6 +2,7 @@
 import type { Component } from 'vue'
 import {
   BookOutline,
+  ClipboardOutline,
   CreateOutline,
   DocumentTextOutline,
   ExtensionPuzzleOutline,
@@ -18,6 +19,7 @@ import {
 export const navIconMap: Record<string, Component> = {
   HomeOutline,
   CreateOutline,
+  ClipboardOutline,
   DocumentTextOutline,
   ExtensionPuzzleOutline,
   ReaderOutline,
@@ -96,6 +98,7 @@ export const adminNav: NavItem = {
   children: [
     { key: '/admin/overview', label: '运营概览', icon: 'HomeOutline' },
     { key: '/admin/questions', label: '题库管理', icon: 'CreateOutline' },
+    { key: '/admin/submissions', label: '批改工作台', icon: 'ClipboardOutline' },
   ],
 }
 

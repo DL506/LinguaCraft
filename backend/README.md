@@ -74,6 +74,9 @@ cd backend
   **AI 出题与后台录入共用 `QuestionContentValidator`**,校验不过不落库,因此不会出现"AI 静默写入脏题"。
   端点与密钥经环境变量注入(`LC_AI_API_KEY`/`LC_AI_BASE_URL`/`LC_AI_MODEL`,样例 `backend/.env.example`,本地实值放不入库的 `backend/.env.local`);
   未注入时应用仍启动,但 `config/RuntimeSafetyReporter` 会逐项 WARN,且四个 AI 入口走降级(作文与无答案题转待批改)。背景见 `docs/verification/A3-AI链路加固与出题闸门.md`。
+- 人工批改(阶段 A4 起):`/api/admin/submissions` 提供队列/材料/判分三接口。待批改件分两种 —— `grading_method=auto` 由 `PendingGradingJob` 到期自动比对出分,**`manual`(写作题与 AI 失败件)只能由本接口判完**。
+  判分落库必须一次写齐 `status='graded'`、`grading_method='manual'`、`score/correct_count/total_count`、`details` 或 `writing_result`、`graded_at`,并**置空 `estimated_time`**;
+  更新带 `status='pending'` 的 CAS 条件,避免与定时任务互相覆盖。背景见 `docs/verification/A4-人工批改工作台.md`。
 - **JSON 栈统一为 Jackson 3**(`tools.jackson.*`,Spring Boot 4 默认):实体主键 `Long` 由 `config/JacksonConfig` 的 `JacksonModule` Bean 全局序列化为字符串(对应前端 `id: string`)。不得再使用 `com.fasterxml.jackson.databind/core` 的类(`com.fasterxml.jackson.annotation` 注解包除外);swagger 注解包版本已在 `pom.xml` 固定为 2.2.52,勿降级。背景见 `docs/verification/S9-Jackson3启动缺陷修复.md`。
 
 ## 目录速览

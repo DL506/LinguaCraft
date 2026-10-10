@@ -67,3 +67,76 @@ export interface AdminQuestionPayload {
   content: Record<string, unknown>
   answerKey?: Record<string, unknown>
 }
+
+/** 管理端批改队列列表项(GET /api/admin/submissions) */
+export interface AdminSubmissionListItem {
+  id: number
+  userId: number
+  nickname?: string
+  type: PracticeType
+  title: string
+  questionId: string
+  /** graded / partially_graded / pending */
+  status: string
+  /** ai 已出分 / auto 定时任务将自动出分 / manual 必须人工处理 */
+  gradingMethod: string
+  score?: number
+  totalScore: number
+  answeredCount: number
+  /** 自提交起的等待分钟数 */
+  waitingMinutes?: number
+  submittedAt: string
+  gradedAt?: string
+}
+
+/** 管理端批改详情(GET /api/admin/submissions/{id}) */
+export interface AdminSubmissionDetail {
+  id: number
+  userId: number
+  nickname?: string
+  type: PracticeType
+  title: string
+  questionId: string
+  status: string
+  gradingMethod: string
+  score?: number
+  totalScore: number
+  /** 客观题为 { "1": "作答", ... };写作为 { content: "正文" } */
+  answers?: Record<string, string>
+  questionContent?: Record<string, unknown>
+  /** 题库参考答案(为空即无答案题,判定完全依赖人工) */
+  answerKey?: Record<string, unknown>
+  questionHasAnswer?: boolean
+  details?: unknown
+  writingResult?: unknown
+  estimatedTime?: string
+  duration?: number
+  waitingMinutes?: number
+  submittedAt: string
+  gradedAt?: string
+}
+
+/** 客观题单题判定(POST /api/admin/submissions/{id}/grade) */
+export interface ManualGradeItem {
+  id: number
+  correctAnswer?: string
+  isCorrect: boolean
+  explanation?: string
+}
+
+/** 作文评分维度 */
+export interface ManualGradeDimension {
+  name: string
+  score: number
+  comment?: string
+}
+
+/** 人工批改请求体 */
+export interface ManualGradePayload {
+  items?: ManualGradeItem[]
+  /** 留空则由后端按"单题分值 × 正确数"累计 */
+  score?: number
+  dimensions?: ManualGradeDimension[]
+  sampleAnswer?: string
+  overallComment?: string
+}

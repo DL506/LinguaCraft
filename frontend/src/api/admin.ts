@@ -7,6 +7,9 @@ import type {
   AdminQuestionDetail,
   AdminQuestionListItem,
   AdminQuestionPayload,
+  AdminSubmissionDetail,
+  AdminSubmissionListItem,
+  ManualGradePayload,
 } from '@/types/admin'
 import type { PageResult } from '@/types/api'
 import type { PracticeType } from '@/types/practice'
@@ -53,4 +56,28 @@ export function setAdminQuestionStatus(id: string, status: 0 | 1): Promise<null>
 /** 删除题目(被提交或错题引用时服务端拒绝) */
 export function deleteAdminQuestion(id: string): Promise<null> {
   return del<null>(`/admin/questions/${encodeURIComponent(id)}`)
+}
+
+/** 批改队列(默认按等待时长正序;method=manual 只看必须人工处理的断链件) */
+export function getAdminSubmissions(
+  params: { status?: string; type?: PracticeType; method?: string; keyword?: string; page?: number; size?: number } = {}
+): Promise<PageResult<AdminSubmissionListItem>> {
+  const query = new URLSearchParams()
+  if (params.status) query.set('status', params.status)
+  if (params.type) query.set('type', params.type)
+  if (params.method) query.set('method', params.method)
+  if (params.keyword) query.set('keyword', params.keyword)
+  query.set('page', String(params.page ?? 1))
+  query.set('size', String(params.size ?? 20))
+  return get<PageResult<AdminSubmissionListItem>>(`/admin/submissions?${query.toString()}`)
+}
+
+/** 判分材料(学生作答 + 题目内容 + 参考答案 + 既有判分) */
+export function getAdminSubmission(id: number): Promise<AdminSubmissionDetail> {
+  return get<AdminSubmissionDetail>(`/admin/submissions/${id}`)
+}
+
+/** 人工判分落库(仅待批改可提交;服务端带 pending 条件防并发覆盖) */
+export function gradeAdminSubmission(id: number, payload: ManualGradePayload): Promise<AdminSubmissionDetail> {
+  return post<AdminSubmissionDetail>(`/admin/submissions/${id}/grade`, payload)
 }
