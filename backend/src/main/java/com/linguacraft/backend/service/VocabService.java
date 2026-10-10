@@ -131,7 +131,8 @@ public class VocabService {
         long safePage = Math.max(page, 1);
         long safeSize = Math.min(Math.max(size, 1), 100);
 
-        var wrapper = Wrappers.<VocabWord>lambdaQuery().orderByAsc(VocabWord::getId);
+        // 自然序:先按 ID 长度再按 ID,避免 w-1000 字典序排在 w-999 之前(后台新增单词后学习顺序会插队)
+        var wrapper = Wrappers.<VocabWord>lambdaQuery().last("ORDER BY LENGTH(id) ASC, id ASC");
         if (book.getFilterLevel() != null) {
             wrapper.eq(VocabWord::getLevel, book.getFilterLevel());
         }
@@ -208,10 +209,7 @@ public class VocabService {
                 Wrappers.<UserWordProgress>lambdaQuery()
                         .eq(UserWordProgress::getUserId, userId)
                         .ge(UserWordProgress::getFirstLearnedAt, startOfDay)).intValue());
-        int reviewCount = Math.toIntExact(progressMapper.selectCount(
-                Wrappers.<UserWordProgress>lambdaQuery()
-                        .eq(UserWordProgress::getUserId, userId)
-                        .le(UserWordProgress::getNextReviewAt, now)).intValue());
+        int reviewCount = countDueReviews(userId, now);
 
         UserSetting setting = userSettingMapper.selectById(userId);
         int target = setting != null && setting.getDailyWordGoal() != null
@@ -225,6 +223,38 @@ public class VocabService {
     }
 
     /**
+     * 今日到期待复习数(只统计词库中仍存在的单词)。
+     *
+     * @param userId 用户 ID
+     * @param now    当前时间
+     * @return 到期条数
+     */
+    private int countDueReviews(Long userId, LocalDateTime now) {
+        List<String> aliveWordIds = existingWordIds();
+        if (aliveWordIds.isEmpty()) {
+            return 0;
+        }
+        Long count = progressMapper.selectCount(Wrappers.<UserWordProgress>lambdaQuery()
+                .eq(UserWordProgress::getUserId, userId)
+                .in(UserWordProgress::getWordId, aliveWordIds)
+                .le(UserWordProgress::getNextReviewAt, now));
+        return count == null ? 0 : count.intValue();
+    }
+
+    /**
+     * 词库现存单词 ID 集合。
+     *
+     * <p>MVP 词量在千级,全量载入换取"孤儿进度不计入"的正确性;与 {@code books()} 里统计 learned 的做法一致。
+     * 若词量涨到十万级,应改为在进度表上做一次 join 或加一列存在标记。</p>
+     *
+     * @return 单词 ID 列表
+     */
+    private List<String> existingWordIds() {
+        return wordMapper.selectList(Wrappers.<VocabWord>lambdaQuery().select(VocabWord::getId))
+                .stream().map(VocabWord::getId).toList();
+    }
+
+    /**
      * 到期复习单词分页(GET /api/vocab/task/due):nextReviewAt <= now,按到期时间升序。
      *
      * @param page 页码
@@ -235,9 +265,16 @@ public class VocabService {
         Long userId = SecurityUtils.getCurrentUserId();
         long safePage = Math.max(page, 1);
         long safeSize = Math.min(Math.max(size, 1), 100);
+        List<String> aliveWordIds = existingWordIds();
+        if (aliveWordIds.isEmpty()) {
+            return new PageResult<>(List.of(), 0L, safePage, safeSize);
+        }
         Page<UserWordProgress> progressPage = progressMapper.selectPage(new Page<>(safePage, safeSize),
                 Wrappers.<UserWordProgress>lambdaQuery()
                         .eq(UserWordProgress::getUserId, userId)
+                        // 只算词库里仍存在的词:word_id 无外键,后台删词会留下孤儿进度行,
+                        // 不过滤的话 total 与"今日待复习数"会包含看不见的幽灵词
+                        .in(UserWordProgress::getWordId, aliveWordIds)
                         .isNotNull(UserWordProgress::getNextReviewAt)
                         .le(UserWordProgress::getNextReviewAt, LocalDateTime.now())
                         .orderByAsc(UserWordProgress::getNextReviewAt));

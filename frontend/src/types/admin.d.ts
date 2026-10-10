@@ -247,7 +247,6 @@ export interface ExamWritingGradePayload {
   /** 错题本条目数 */
   mistakeTotal: number
 }
-
 /** 管理端用户列表项(GET /api/admin/users) */
 export interface AdminUserListItem {
   id: number
@@ -287,4 +286,58 @@ export interface AdminUserDetail {
   gradingPreference?: string
   createdAt?: string
   updatedAt?: string
+}
+
+/** 管理端词书项(GET /api/admin/vocab/books) */
+export interface AdminVocabBook {
+  id: string
+  name: string
+  /** 声明总词数(展示值,可远大于实际导入量) */
+  declaredTotal?: number
+  /** 真实词数(按 filterLevel 统计) */
+  actualWordCount: number
+  /** 过滤等级;空表示不限 */
+  filterLevel?: string | null
+  sortOrder?: number
+}
+
+/** 词书新建/更新请求 */
+export interface VocabBookPayload {
+  name: string
+  total?: number
+  filterLevel?: string | null
+  sortOrder?: number
+}
+
+/** 管理端单词项(GET /api/admin/vocab/words) */
+export interface AdminWord {
+  id: string
+  spelling: string
+  phonetic: string
+  partOfSpeech: string
+  meanings: string[]
+  level: string
+  exampleSentence?: string | null
+  exampleTranslation?: string | null
+  realExamSentence?: string | null
+  realExamSource?: string | null
+  audioUrl?: string | null
+  /** 在学用户数 + 复习记录数(>0 不可删) */
+  learnedUserCount: number
+  /** 被收藏次数(>0 不可删) */
+  favoriteCount: number
+}
+
+/** 单词新建/更新请求 */
+export interface WordPayload {
+  spelling: string
+  phonetic: string
+  partOfSpeech: string
+  meanings: string[]
+  level: string
+  exampleSentence?: string
+  exampleTranslation?: string
+  realExamSentence?: string
+  realExamSource?: string
+  audioUrl?: string
 }

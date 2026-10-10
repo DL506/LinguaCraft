@@ -14,8 +14,12 @@ import type {
   AdminSubmissionListItem,
   AdminUserDetail,
   AdminUserListItem,
+  AdminVocabBook,
+  AdminWord,
   ExamWritingGradePayload,
   ManualGradePayload,
+  VocabBookPayload,
+  WordPayload,
 } from '@/types/admin'
 import type { PageResult } from '@/types/api'
 import type { PracticeType } from '@/types/practice'
@@ -51,6 +55,58 @@ export function getAdminUser(id: number): Promise<AdminUserDetail> {
 /** 启用/停用(注意:已签发令牌不受影响,停用最长 2 小时才对旧会话生效) */
 export function setAdminUserEnabled(id: number, enabled: boolean): Promise<null> {
   return patch<null>(`/admin/users/${id}/status?enabled=${enabled}`)
+}
+
+/** 词书列表(含声明词数与真实词数) */
+export function getAdminVocabBooks(): Promise<AdminVocabBook[]> {
+  return get<AdminVocabBook[]>('/admin/vocab/books')
+}
+
+/** 新建词书 */
+export function createAdminVocabBook(payload: VocabBookPayload): Promise<AdminVocabBook> {
+  return post<AdminVocabBook>('/admin/vocab/books', payload)
+}
+
+/** 更新词书(不会自动改写声明总词数) */
+export function updateAdminVocabBook(id: string, payload: VocabBookPayload): Promise<AdminVocabBook> {
+  return put<AdminVocabBook>(`/admin/vocab/books/${encodeURIComponent(id)}`, payload)
+}
+
+/** 把声明总词数对齐为真实词数(显式操作) */
+export function syncAdminVocabBookTotal(id: string): Promise<AdminVocabBook> {
+  return patch<AdminVocabBook>(`/admin/vocab/books/${encodeURIComponent(id)}/sync-total`)
+}
+
+/** 删除词书(学生端默认词书 book-syllabus 会被拒) */
+export function deleteAdminVocabBook(id: string): Promise<null> {
+  return del<null>(`/admin/vocab/books/${encodeURIComponent(id)}`)
+}
+
+/** 单词列表(按拼写字典序;含引用计数) */
+export function getAdminWords(
+  params: { level?: string; keyword?: string; page?: number; size?: number } = {}
+): Promise<PageResult<AdminWord>> {
+  const query = new URLSearchParams()
+  if (params.level) query.set('level', params.level)
+  if (params.keyword) query.set('keyword', params.keyword)
+  query.set('page', String(params.page ?? 1))
+  query.set('size', String(params.size ?? 20))
+  return get<PageResult<AdminWord>>(`/admin/vocab/words?${query.toString()}`)
+}
+
+/** 新建单词(ID 由服务端按最大数字后缀生成) */
+export function createAdminWord(payload: WordPayload): Promise<AdminWord> {
+  return post<AdminWord>('/admin/vocab/words', payload)
+}
+
+/** 更新单词(改 level 即改它属于哪些词书) */
+export function updateAdminWord(id: string, payload: WordPayload): Promise<AdminWord> {
+  return put<AdminWord>(`/admin/vocab/words/${encodeURIComponent(id)}`, payload)
+}
+
+/** 删除单词(有学习记录或收藏时服务端拒绝) */
+export function deleteAdminWord(id: string): Promise<null> {
+  return del<null>(`/admin/vocab/words/${encodeURIComponent(id)}`)
 }
 
 /** 调整角色(只接受 student/admin;不许给自己降权) */
