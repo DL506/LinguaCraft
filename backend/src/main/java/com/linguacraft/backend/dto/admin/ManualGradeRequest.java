@@ -45,7 +45,7 @@ public class ManualGradeRequest {
     /** 作文评分维度(写作题必填) */
     @Valid
     @Schema(description = "作文评分维度(写作题必填)")
-    private List<Dimension> dimensions;
+    private List<GradeDimension> dimensions;
 
     /** 作文参考范文 */
     @Schema(description = "作文参考范文(可空)")
@@ -83,31 +83,5 @@ public class ManualGradeRequest {
         /** 评语/解析 */
         @Schema(description = "评语或解析(可空)")
         private String explanation;
-    }
-
-    /**
-     * 作文评分维度项。
-     */
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    @Schema(description = "作文评分维度")
-    public static class Dimension {
-
-        /** 维度名称(取自题目的 scoringDimensions) */
-        @NotEmpty(message = "维度名称不能为空")
-        @Schema(description = "维度名称", example = "内容要点")
-        private String name;
-
-        /** 该维度得分 */
-        @NotNull(message = "维度得分不能为空")
-        @Schema(description = "该维度得分", example = "4.0")
-        private BigDecimal score;
-
-        /** 该维度评语 */
-        @Schema(description = "该维度评语(可空)")
-        private String comment;
     }
 }

@@ -77,6 +77,9 @@ cd backend
 - 人工批改(阶段 A4 起):`/api/admin/submissions` 提供队列/材料/判分三接口。待批改件分两种 —— `grading_method=auto` 由 `PendingGradingJob` 到期自动比对出分,**`manual`(写作题与 AI 失败件)只能由本接口判完**。
   判分落库必须一次写齐 `status='graded'`、`grading_method='manual'`、`score/correct_count/total_count`、`details` 或 `writing_result`、`graded_at`,并**置空 `estimated_time`**;
   更新带 `status='pending'` 的 CAS 条件,避免与定时任务互相覆盖。背景见 `docs/verification/A4-人工批改工作台.md`。
+- 模考作文判分(阶段 A4-②):`/api/admin/exam-submissions` 队列/材料/`POST /{id}/grade-writing`。只写写作列(`writing_score`/`writing_result`/`writing_graded_at`/`status='graded'`/`grading_method='manual'`,清空 `estimated_time`),客观分不动;
+  CAS 用 `writing_graded_at IS NULL AND status<>'graded'`,与 `ExamAsyncGrader` 互斥。**写作满分取自试卷 writing section 的 score**,不是硬编码。
+  两条人工批改路径的 `writing_result` 一律由 `service/WritingGradeSupport` 产出;成绩报告 `ExamReportDto` 现含 `writingDimensions`/`writingSampleAnswer`/`writingOverallComment`(此前只落库不下发)。
 - **JSON 栈统一为 Jackson 3**(`tools.jackson.*`,Spring Boot 4 默认):实体主键 `Long` 由 `config/JacksonConfig` 的 `JacksonModule` Bean 全局序列化为字符串(对应前端 `id: string`)。不得再使用 `com.fasterxml.jackson.databind/core` 的类(`com.fasterxml.jackson.annotation` 注解包除外);swagger 注解包版本已在 `pom.xml` 固定为 2.2.52,勿降级。背景见 `docs/verification/S9-Jackson3启动缺陷修复.md`。
 
 ## 目录速览

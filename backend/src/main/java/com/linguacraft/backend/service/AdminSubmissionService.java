@@ -72,15 +72,18 @@ public class AdminSubmissionService {
     private final QuestionMapper questionMapper;
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
+    private final WritingGradeSupport writingGradeSupport;
 
     public AdminSubmissionService(PracticeSubmissionMapper submissionMapper,
                                   QuestionMapper questionMapper,
                                   UserMapper userMapper,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper,
+                                  WritingGradeSupport writingGradeSupport) {
         this.submissionMapper = submissionMapper;
         this.questionMapper = questionMapper;
         this.userMapper = userMapper;
         this.objectMapper = objectMapper;
+        this.writingGradeSupport = writingGradeSupport;
     }
 
     // ==================== 查询 ====================
@@ -214,8 +217,12 @@ public class AdminSubmissionService {
         BigDecimal score;
 
         if (writing) {
-            writingJson = buildWritingResult(request, cap);
-            score = request.getScore() != null ? request.getScore() : dimensionSum(request.getDimensions());
+            writingJson = writingGradeSupport
+                    .buildResult(request.getDimensions(), request.getSampleAnswer(), request.getOverallComment(),
+                            cap, "卷面总分")
+                    .toString();
+            score = request.getScore() != null ? request.getScore()
+                    : writingGradeSupport.dimensionSum(request.getDimensions());
         } else {
             Map<Integer, String> answered = parseAnswers(submission.getAnswers());
             ObjectNode details = buildDetails(request, answered);
@@ -255,57 +262,6 @@ public class AdminSubmissionService {
     }
 
     // ==================== 判分计算 ====================
-
-    /**
-     * 组装作文批改结果 JSON(维度/范文/总评),并校验维度分非负。
-     *
-     * @param request 判分请求
-     * @param cap     卷面总分
-     * @return writing_result JSON
-     */
-    private String buildWritingResult(ManualGradeRequest request, BigDecimal cap) {
-        List<ManualGradeRequest.Dimension> dimensions = request.getDimensions();
-        if (dimensions == null || dimensions.isEmpty()) {
-            throw new BizException(ResultCode.PARAM_ERROR.getCode(), "作文题必须提交至少一个评分维度(dimensions)");
-        }
-        ObjectNode root = objectMapper.createObjectNode();
-        var array = root.putArray("dimensions");
-        for (ManualGradeRequest.Dimension dimension : dimensions) {
-            if (dimension.getScore() == null || dimension.getScore().signum() < 0) {
-                throw new BizException(ResultCode.PARAM_ERROR.getCode(),
-                        "维度「" + dimension.getName() + "」得分不能为空或为负");
-            }
-            ObjectNode node = array.addObject();
-            node.put("name", dimension.getName());
-            node.put("score", dimension.getScore().setScale(1, RoundingMode.HALF_UP));
-            node.put("comment", dimension.getComment() == null ? "" : dimension.getComment());
-        }
-        if (request.getSampleAnswer() != null && !request.getSampleAnswer().isBlank()) {
-            root.put("sampleAnswer", request.getSampleAnswer());
-        }
-        if (request.getOverallComment() != null && !request.getOverallComment().isBlank()) {
-            root.put("overallComment", request.getOverallComment());
-        }
-        BigDecimal sum = dimensionSum(dimensions);
-        if (cap != null && sum.compareTo(cap) > 0) {
-            throw new BizException(ResultCode.PARAM_ERROR.getCode(),
-                    "维度分之和 " + sum + " 超过卷面总分 " + cap + ",请调整各维度得分");
-        }
-        return root.toString();
-    }
-
-    /**
-     * 维度分之和(保留 1 位小数)。
-     *
-     * @param dimensions 维度列表
-     * @return 合计
-     */
-    private BigDecimal dimensionSum(List<ManualGradeRequest.Dimension> dimensions) {
-        return dimensions.stream()
-                .map(ManualGradeRequest.Dimension::getScore)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(1, RoundingMode.HALF_UP);
-    }
 
     /**
      * 组装逐题判分明细 JSON 数组,并核对题号集合与学生作答一致。

@@ -3,6 +3,7 @@ package com.linguacraft.backend.service;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.dto.admin.AdminSubmissionDetailDto;
+import com.linguacraft.backend.dto.admin.GradeDimension;
 import com.linguacraft.backend.dto.admin.ManualGradeRequest;
 import com.linguacraft.backend.entity.PracticeSubmission;
 import com.linguacraft.backend.entity.Question;
@@ -50,7 +51,9 @@ class AdminSubmissionServiceTest {
     private UserMapper userMapper;
 
     private AdminSubmissionService newService() {
-        return new AdminSubmissionService(submissionMapper, questionMapper, userMapper, new ObjectMapper());
+        ObjectMapper mapper = new ObjectMapper();
+        return new AdminSubmissionService(submissionMapper, questionMapper, userMapper, mapper,
+                new WritingGradeSupport(mapper));
     }
 
     /** 一条待批改的客观题提交(学生作答了题号 1 与 2) */
@@ -165,8 +168,8 @@ class AdminSubmissionServiceTest {
 
         assertThatThrownBy(() -> newService().grade(17L, ManualGradeRequest.builder()
                 .dimensions(List.of(
-                        ManualGradeRequest.Dimension.builder().name("内容要点").score(new BigDecimal("8")).build(),
-                        ManualGradeRequest.Dimension.builder().name("语言表达").score(new BigDecimal("8")).build()))
+                        GradeDimension.builder().name("内容要点").score(new BigDecimal("8")).build(),
+                        GradeDimension.builder().name("语言表达").score(new BigDecimal("8")).build()))
                 .build()))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("超过卷面总分");

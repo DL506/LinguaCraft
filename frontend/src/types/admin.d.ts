@@ -140,3 +140,62 @@ export interface ManualGradePayload {
   sampleAnswer?: string
   overallComment?: string
 }
+
+/** 管理端模考批改队列列表项(GET /api/admin/exam-submissions) */
+export interface AdminExamSubmissionListItem {
+  id: number
+  userId: number
+  nickname?: string
+  examId: string
+  paperTitle?: string
+  year?: number
+  status: string
+  gradingMethod: string
+  objectiveScore?: number
+  writingScore?: number
+  totalScore: number
+  /** false 即作文还欠着,需要人工或 AI 出分 */
+  writingGraded: boolean
+  /** 学生是否真的写了正文(空白正文不可判) */
+  hasWritingContent: boolean
+  waitingMinutes?: number
+  submittedAt: string
+  writingGradedAt?: string
+}
+
+/** 管理端模考批改详情(GET /api/admin/exam-submissions/{id}) */
+export interface AdminExamSubmissionDetail {
+  id: number
+  userId: number
+  nickname?: string
+  examId: string
+  paperTitle?: string
+  year?: number
+  status: string
+  gradingMethod: string
+  objectiveScore?: number
+  writingScore?: number
+  totalScore: number
+  /** 写作部分满分(取自试卷 section 分值,兜底 15) */
+  writingFullScore: number
+  writingContent?: string
+  /** 试卷写作部分(prompt / requirements / scoringDimensions / wordLimit) */
+  writingSection?: Record<string, unknown>
+  sectionScores?: Record<string, number>
+  writingResult?: Record<string, unknown>
+  writingGraded: boolean
+  estimatedTime?: string
+  duration?: number
+  waitingMinutes?: number
+  submittedAt: string
+  writingGradedAt?: string
+}
+
+/** 模考作文人工批改请求体(POST /api/admin/exam-submissions/{id}/grade-writing) */
+export interface ExamWritingGradePayload {
+  dimensions: ManualGradeDimension[]
+  /** 留空按维度合计 */
+  score?: number
+  sampleAnswer?: string
+  overallComment?: string
+}

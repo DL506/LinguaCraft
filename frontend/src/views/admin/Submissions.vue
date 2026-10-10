@@ -14,41 +14,87 @@
       </n-space>
     </div>
 
-    <!-- 筛选:状态 / 题型 / 判分方式 / 关键词 -->
-    <div class="grading__filters">
-      <n-select v-model:value="filterStatus" size="small" :options="statusOptions" style="width: 128px" @update:value="reload" />
-      <n-select v-model:value="filterType" size="small" :options="typeOptions" style="width: 132px" @update:value="reload" />
-      <n-select v-model:value="filterMethod" size="small" :options="methodOptions" style="width: 148px" @update:value="reload" />
-      <n-input
-        v-model:value="keyword"
-        size="small"
-        placeholder="标题或题目 ID"
-        clearable
-        style="width: 220px"
-        @keyup.enter="reload"
-        @clear="reload"
-      />
-      <n-button size="small" @click="reload">查询</n-button>
-    </div>
+    <n-tabs v-model:value="tab" type="segment" class="grading__tabs" @update:value="onTabChange">
+      <n-tab-pane name="practice" tab="练习提交">
+        <!-- 筛选:状态 / 题型 / 判分方式 / 关键词 -->
+        <div class="grading__filters">
+          <n-select v-model:value="filterStatus" size="small" :options="statusOptions" style="width: 128px" @update:value="reload" />
+          <n-select v-model:value="filterType" size="small" :options="typeOptions" style="width: 132px" @update:value="reload" />
+          <n-select v-model:value="filterMethod" size="small" :options="methodOptions" style="width: 148px" @update:value="reload" />
+          <n-input
+            v-model:value="keyword"
+            size="small"
+            placeholder="标题或题目 ID"
+            clearable
+            style="width: 220px"
+            @keyup.enter="reload"
+            @clear="reload"
+          />
+          <n-button size="small" @click="reload">查询</n-button>
+        </div>
 
-    <n-alert type="info" :show-icon="false" class="grading__notice">
-      判分方式 <b>auto</b> 的提交会在阈值后由定时任务自动比对出分,无需人工插手;<b>manual</b>(写作题、AI 批改失败件)
-      必须在这里判完,否则学生会一直看到「待批改」。
-    </n-alert>
+        <n-alert type="info" :show-icon="false" class="grading__notice">
+          判分方式 <b>auto</b> 的提交会在阈值后由定时任务自动比对出分,无需人工插手;<b>manual</b>(写作题、AI 批改失败件)
+          必须在这里判完,否则学生会一直看到「待批改」。
+        </n-alert>
 
-    <n-data-table
-      :columns="columns"
-      :data="list"
-      :loading="loading"
-      :bordered="false"
-      :scroll-x="1120"
-      :row-key="(row: AdminSubmissionListItem) => row.id"
-    />
+        <n-data-table
+          :columns="columns"
+          :data="list"
+          :loading="loading"
+          :bordered="false"
+          :scroll-x="1120"
+          :row-key="(row: AdminSubmissionListItem) => row.id"
+        />
 
-    <div class="grading__pager">
-      <n-pagination :page="page" :page-size="PAGE_SIZE" :item-count="total" @update:page="onPageChange" />
-      <span class="grading__count">共 {{ total }} 条</span>
-    </div>
+        <div class="grading__pager">
+          <n-pagination :page="page" :page-size="PAGE_SIZE" :item-count="total" @update:page="onPageChange" />
+          <span class="grading__count">共 {{ total }} 条</span>
+        </div>
+      </n-tab-pane>
+
+      <!-- 模考提交:客观分交卷即算,这里只补写作部分 -->
+      <n-tab-pane name="exam" tab="模考提交">
+        <div class="grading__filters">
+          <n-select
+            v-model:value="examFilterStatus"
+            size="small"
+            :options="statusOptions"
+            style="width: 128px"
+            @update:value="reloadExam"
+          />
+          <n-input
+            v-model:value="examKeyword"
+            size="small"
+            placeholder="试卷 ID,如 exam-2026"
+            clearable
+            style="width: 220px"
+            @keyup.enter="reloadExam"
+            @clear="reloadExam"
+          />
+          <n-button size="small" @click="reloadExam">查询</n-button>
+        </div>
+
+        <n-alert type="info" :show-icon="false" class="grading__notice">
+          模考的客观题得分在交卷时就算好了;这一栏只处理<b>写作部分</b>。AI 作文评分失败时提交会停在
+          partially_graded 且写作永远不出分,在这里判完即流转为已批改。
+        </n-alert>
+
+        <n-data-table
+          :columns="examColumns"
+          :data="examList"
+          :loading="examLoading"
+          :bordered="false"
+          :scroll-x="1100"
+          :row-key="(row: AdminExamSubmissionListItem) => row.id"
+        />
+
+        <div class="grading__pager">
+          <n-pagination :page="examPage" :page-size="PAGE_SIZE" :item-count="examTotal" @update:page="onExamPageChange" />
+          <span class="grading__count">共 {{ examTotal }} 条</span>
+        </div>
+      </n-tab-pane>
+    </n-tabs>
 
     <!-- 判分抽屉 -->
     <n-drawer v-model:show="drawerShow" :width="isMobile ? '100%' : 640" placement="right">
@@ -119,6 +165,67 @@
         </n-spin>
       </n-drawer-content>
     </n-drawer>
+
+    <!-- 模考作文判分抽屉 -->
+    <n-drawer v-model:show="examDrawerShow" :width="isMobile ? '100%' : 640" placement="right">
+      <n-drawer-content
+        :title="examDetail ? `模考作文判分 · #${examDetail.id}` : '模考作文判分'"
+        closable
+        :native-scrollbar="false"
+      >
+        <n-spin :show="examDetailLoading">
+          <div v-if="examDetail" class="grade">
+            <div class="grade__meta">
+              <n-tag size="small" :bordered="false" type="info">{{ examDetail.paperTitle || examDetail.examId }}</n-tag>
+              <span>{{ examDetail.nickname || '未知用户' }}</span>
+              <span>客观 {{ examDetail.objectiveScore }} 分</span>
+              <span>写作满分 {{ examDetail.writingFullScore }}</span>
+              <span>等待 {{ formatWaiting(examDetail.waitingMinutes) }}</span>
+            </div>
+
+            <n-card size="small" title="写作题目" class="grade__card">
+              <p class="grade__prompt">{{ writingPromptText }}</p>
+              <p v-if="writingRequirements.length" class="grade__hint">要点:{{ writingRequirements.join(' / ') }}</p>
+              <p class="grade__hint">字数要求:{{ writingWordLimit }} 词</p>
+            </n-card>
+
+            <n-card size="small" title="学生作文与评分" class="grade__card">
+              <div class="grade__answer">{{ examDetail.writingContent || '(未作答)' }}</div>
+              <div v-for="(row, index) in examDimensionRows" :key="row.name" class="grade__dim">
+                <span class="grade__dim-name">{{ row.name }}</span>
+                <n-input-number v-model:value="row.score" size="small" :min="0" :max="100" style="width: 108px" />
+                <n-input v-model:value="row.comment" size="small" placeholder="该维度评语(可空)" />
+                <n-button size="tiny" quaternary type="error" @click="examDimensionRows.splice(index, 1)">删</n-button>
+              </div>
+              <n-button size="tiny" dashed @click="addExamDimension">+ 加一个维度</n-button>
+              <div class="grade__sum">
+                维度合计 <b>{{ examDimensionTotal }}</b> / 写作满分 {{ examDetail.writingFullScore }}
+                <span v-if="examDimensionTotal > Number(examDetail.writingFullScore)" class="grade__over">
+                  超出写作满分,不可提交
+                </span>
+              </div>
+              <label class="grade__label">参考范文(可空)</label>
+              <n-input v-model:value="examSampleAnswer" type="textarea" :autosize="{ minRows: 2 }" />
+              <label class="grade__label">总评</label>
+              <n-input v-model:value="examOverallComment" type="textarea" :autosize="{ minRows: 2 }" />
+              <label class="grade__label">写作得分覆盖(可空,留空按维度合计)</label>
+              <n-input-number
+                v-model:value="examScoreOverride"
+                size="small"
+                :min="0"
+                :max="Number(examDetail.writingFullScore)"
+                style="width: 148px"
+              />
+            </n-card>
+
+            <div class="grade__actions">
+              <n-button size="small" @click="examDrawerShow = false">取消</n-button>
+              <n-button size="small" type="primary" :loading="examSubmitting" @click="onExamSubmit">提交判分</n-button>
+            </div>
+          </div>
+        </n-spin>
+      </n-drawer-content>
+    </n-drawer>
   </div>
 </template>
 
@@ -139,12 +246,23 @@ import {
   NSpace,
   NSpin,
   NSelect,
+  NTabPane,
+  NTabs,
   NTag,
   useMessage,
   type DataTableColumns,
 } from 'naive-ui'
-import { getAdminSubmission, getAdminSubmissions, gradeAdminSubmission } from '@/api/admin'
+import {
+  getAdminExamSubmission,
+  getAdminExamSubmissions,
+  getAdminSubmission,
+  getAdminSubmissions,
+  gradeAdminExamWriting,
+  gradeAdminSubmission,
+} from '@/api/admin'
 import type {
+  AdminExamSubmissionDetail,
+  AdminExamSubmissionListItem,
   AdminSubmissionDetail,
   AdminSubmissionListItem,
   ManualGradeDimension,
@@ -455,6 +573,178 @@ async function onSubmit(): Promise<void> {
   }
 }
 
+// ==================== 模考提交页签(阶段 A4-②)====================
+const tab = ref<'practice' | 'exam'>('practice')
+
+const examList = ref<AdminExamSubmissionListItem[]>([])
+const examTotal = ref(0)
+const examPage = ref(1)
+const examLoading = ref(false)
+/** 默认落在"客观分已出、作文欠着"这批 —— 它们正是 AI 批改失败后的死档 */
+const examFilterStatus = ref<string | null>('partially_graded')
+const examKeyword = ref('')
+
+const examDrawerShow = ref(false)
+const examDetailLoading = ref(false)
+const examSubmitting = ref(false)
+const examDetail = ref<AdminExamSubmissionDetail | null>(null)
+const examDimensionRows = ref<{ name: string; score: number | null; comment: string }[]>([])
+const examSampleAnswer = ref('')
+const examOverallComment = ref('')
+const examScoreOverride = ref<number | null>(null)
+
+const examColumns: DataTableColumns<AdminExamSubmissionListItem> = [
+  { title: '提交', key: 'id', width: 76 },
+  { title: '学生', key: 'nickname', width: 110, render: (row) => row.nickname || '-' },
+  { title: '试卷', key: 'paperTitle', minWidth: 200, ellipsis: { tooltip: true } },
+  {
+    title: '作文',
+    key: 'writingGraded',
+    width: 104,
+    render: (row) =>
+      h(
+        NTag,
+        {
+          size: 'small',
+          bordered: false,
+          type: row.writingGraded ? 'success' : row.hasWritingContent ? 'warning' : 'default',
+        },
+        { default: () => (row.writingGraded ? '已出分' : row.hasWritingContent ? '待判' : '未写') }
+      ),
+  },
+  { title: '客观分', key: 'objectiveScore', width: 92, render: (row) => row.objectiveScore ?? '-' },
+  { title: '写作分', key: 'writingScore', width: 88, render: (row) => row.writingScore ?? '-' },
+  { title: '卷面', key: 'totalScore', width: 80 },
+  {
+    title: '判分方式',
+    key: 'gradingMethod',
+    width: 96,
+    render: (row) => METHOD_LABELS[row.gradingMethod] ?? row.gradingMethod,
+  },
+  {
+    title: '等待',
+    key: 'waitingMinutes',
+    width: 116,
+    render: (row) => (row.writingGraded ? '-' : formatWaiting(row.waitingMinutes)),
+  },
+  { title: '交卷时间', key: 'submittedAt', width: 160, render: (row) => row.submittedAt.replace('T', ' ') },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 108,
+    fixed: 'right',
+    render: (row) =>
+      h(
+        NButton,
+        { size: 'tiny', tertiary: true, type: 'primary', onClick: () => openExamDetail(row) },
+        { default: () => (row.writingGraded ? '查看' : '判作文') }
+      ),
+  },
+]
+
+async function fetchExamList(): Promise<void> {
+  examLoading.value = true
+  try {
+    const res = await getAdminExamSubmissions({
+      status: examFilterStatus.value || undefined,
+      keyword: examKeyword.value.trim() || undefined,
+      page: examPage.value,
+      size: PAGE_SIZE,
+    })
+    examList.value = res.list
+    examTotal.value = res.total
+  } finally {
+    examLoading.value = false
+  }
+}
+
+function reloadExam(): void {
+  examPage.value = 1
+  void fetchExamList()
+}
+
+function onExamPageChange(next: number): void {
+  examPage.value = next
+  void fetchExamList()
+}
+
+/** 切页签时懒加载模考队列(避免进页面就打两次请求) */
+function onTabChange(value: string | number): void {
+  if (value === 'exam' && examList.value.length === 0) void fetchExamList()
+}
+
+async function openExamDetail(row: AdminExamSubmissionListItem): Promise<void> {
+  examDrawerShow.value = true
+  examDetailLoading.value = true
+  examDetail.value = null
+  examDimensionRows.value = []
+  examSampleAnswer.value = ''
+  examOverallComment.value = ''
+  examScoreOverride.value = null
+  try {
+    const data = await getAdminExamSubmission(row.id)
+    examDetail.value = data
+    const names = ((data.writingSection?.scoringDimensions as string[]) ?? [])
+    // 已判过的行回显既有结果,便于复核
+    const existing = (data.writingResult?.dimensions as { name: string; score: number; comment: string }[]) ?? []
+    examDimensionRows.value = (existing.length ? existing.map((d) => d.name) : names).map((name) => {
+      const hit = existing.find((d) => d.name === name)
+      return { name, score: hit ? Number(hit.score) : null, comment: hit ? hit.comment : '' }
+    })
+    examSampleAnswer.value = String(data.writingResult?.sampleAnswer ?? '')
+    examOverallComment.value = String(data.writingResult?.overallComment ?? '')
+  } finally {
+    examDetailLoading.value = false
+  }
+}
+
+function addExamDimension(): void {
+  examDimensionRows.value.push({ name: '新维度', score: null, comment: '' })
+}
+
+const writingPromptText = computed(() => String(examDetail.value?.writingSection?.prompt ?? ''))
+const writingRequirements = computed(() => (examDetail.value?.writingSection?.requirements as string[]) ?? [])
+const writingWordLimit = computed(() => examDetail.value?.writingSection?.wordLimit ?? 120)
+
+const examDimensionTotal = computed(() =>
+  Number(examDimensionRows.value.reduce((sum, row) => sum + Number(row.score ?? 0), 0).toFixed(1))
+)
+
+async function onExamSubmit(): Promise<void> {
+  const current = examDetail.value
+  if (!current) return
+  const dimensions = examDimensionRows.value.map((row) => ({
+    name: row.name.trim(),
+    score: Number(row.score ?? 0),
+    comment: row.comment.trim(),
+  }))
+  if (dimensions.length === 0) {
+    message.warning('至少需要一个评分维度')
+    return
+  }
+  if (dimensions.some((row) => !row.name || !Number.isFinite(row.score))) {
+    message.warning('每个维度都要有名称和分数')
+    return
+  }
+
+  examSubmitting.value = true
+  try {
+    await gradeAdminExamWriting(current.id, {
+      dimensions,
+      sampleAnswer: examSampleAnswer.value.trim() || undefined,
+      overallComment: examOverallComment.value.trim() || undefined,
+      score: examScoreOverride.value ?? undefined,
+    })
+    message.success('作文已判分,学生成绩报告立刻可见')
+    examDrawerShow.value = false
+    void fetchExamList()
+  } catch {
+    /* 服务端拒绝原因(已出分、无正文、超满分、被抢先)由 request 层弹出 */
+  } finally {
+    examSubmitting.value = false
+  }
+}
+
 onMounted(fetchList)
 </script>
 
@@ -469,6 +759,10 @@ onMounted(fetchList)
 .grading__title {
   margin: 0;
   font-size: 20px;
+}
+
+.grading__tabs {
+  margin-top: 4px;
 }
 
 .grading__filters {

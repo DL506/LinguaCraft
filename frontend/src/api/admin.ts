@@ -4,11 +4,14 @@
 import { del, get, patch, post, put } from './request'
 import type {
   AdminPing,
+  AdminExamSubmissionDetail,
+  AdminExamSubmissionListItem,
   AdminQuestionDetail,
   AdminQuestionListItem,
   AdminQuestionPayload,
   AdminSubmissionDetail,
   AdminSubmissionListItem,
+  ExamWritingGradePayload,
   ManualGradePayload,
 } from '@/types/admin'
 import type { PageResult } from '@/types/api'
@@ -80,4 +83,29 @@ export function getAdminSubmission(id: number): Promise<AdminSubmissionDetail> {
 /** 人工判分落库(仅待批改可提交;服务端带 pending 条件防并发覆盖) */
 export function gradeAdminSubmission(id: number, payload: ManualGradePayload): Promise<AdminSubmissionDetail> {
   return post<AdminSubmissionDetail>(`/admin/submissions/${id}/grade`, payload)
+}
+
+/** 模考批改队列(客观分交卷即算;writingGraded=false 的行才是欠着的) */
+export function getAdminExamSubmissions(
+  params: { status?: string; keyword?: string; page?: number; size?: number } = {}
+): Promise<PageResult<AdminExamSubmissionListItem>> {
+  const query = new URLSearchParams()
+  if (params.status) query.set('status', params.status)
+  if (params.keyword) query.set('keyword', params.keyword)
+  query.set('page', String(params.page ?? 1))
+  query.set('size', String(params.size ?? 20))
+  return get<PageResult<AdminExamSubmissionListItem>>(`/admin/exam-submissions?${query.toString()}`)
+}
+
+/** 模考判分材料(作文正文、写作部分题目与满分、客观各部分得分) */
+export function getAdminExamSubmission(id: number): Promise<AdminExamSubmissionDetail> {
+  return get<AdminExamSubmissionDetail>(`/admin/exam-submissions/${id}`)
+}
+
+/** 模考作文人工判分(与 AI 异步批改器互斥,靠 writing_graded_at IS NULL 兜住) */
+export function gradeAdminExamWriting(
+  id: number,
+  payload: ExamWritingGradePayload
+): Promise<AdminExamSubmissionDetail> {
+  return post<AdminExamSubmissionDetail>(`/admin/exam-submissions/${id}/grade-writing`, payload)
 }

@@ -19,6 +19,7 @@ import com.linguacraft.backend.dto.exam.ExamSubmitRequest;
 import com.linguacraft.backend.dto.exam.HistoryScoreDto;
 import com.linguacraft.backend.dto.practice.SubmitDetailDto;
 import com.linguacraft.backend.dto.practice.SubmitResultResponse;
+import com.linguacraft.backend.dto.practice.WritingDimensionDto;
 import com.linguacraft.backend.entity.ExamPaper;
 import com.linguacraft.backend.entity.ExamProgress;
 import com.linguacraft.backend.entity.ExamSubmission;
@@ -505,6 +506,28 @@ public class ExamService {
         BigDecimal score = writingGraded && writingScore != null
                 ? submission.getObjectiveScore().add(writingScore).setScale(1, RoundingMode.HALF_UP)
                 : submission.getObjectiveScore();
+
+        // 作文反馈(维度/范文/总评)此前只落库不下发:AI 与人工都写了 writing_result,
+        // 但报告拿不到,学生只看得到一个分数。此处按练习批改同形状读出。
+        List<WritingDimensionDto> writingDimensions = new ArrayList<>();
+        String writingSampleAnswer = null;
+        String writingOverallComment = null;
+        JsonNode writingResult = readTree(submission.getWritingResult());
+        if (writingResult != null) {
+            JsonNode dimensionNode = writingResult.get("dimensions");
+            if (dimensionNode != null && dimensionNode.isArray()) {
+                for (JsonNode dimension : dimensionNode) {
+                    writingDimensions.add(WritingDimensionDto.builder()
+                            .name(dimension.path("name").asText(""))
+                            .score(dimension.path("score").decimalValue())
+                            .comment(dimension.path("comment").asText(""))
+                            .build());
+                }
+            }
+            writingSampleAnswer = writingResult.path("sampleAnswer").asText(null);
+            writingOverallComment = writingResult.path("overallComment").asText(null);
+        }
+
         return ExamReportDto.builder()
                 .score(score)
                 .totalScore(paper.getTotalScore())
@@ -514,6 +537,9 @@ public class ExamService {
                 .objectiveGraded(!STATUS_PENDING.equals(submission.getStatus()))
                 .writingGraded(writingGraded)
                 .writingScore(writingScore)
+                .writingDimensions(writingDimensions.isEmpty() ? null : writingDimensions)
+                .writingSampleAnswer(writingSampleAnswer)
+                .writingOverallComment(writingOverallComment)
                 .build();
     }
 

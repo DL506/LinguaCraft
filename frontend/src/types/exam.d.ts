@@ -109,4 +109,10 @@ export interface ExamReport {
   writingGraded: boolean
   /** 写作得分(写作已批改时返回) */
   writingScore?: number
+  /** 写作逐维评分(写作已批改时返回;与练习批改 dimensions 同形状) */
+  writingDimensions?: { name: string; score: number; comment?: string }[]
+  /** 写作参考范文 */
+  writingSampleAnswer?: string
+  /** 写作总评 */
+  writingOverallComment?: string
 }

@@ -1,6 +1,7 @@
 package com.linguacraft.backend.dto.exam;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.linguacraft.backend.dto.practice.WritingDimensionDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -51,4 +52,16 @@ public class ExamReportDto {
     /** 写作得分(写作已批改时返回) */
     @Schema(description = "写作得分(写作已批改时返回)")
     private BigDecimal writingScore;
+
+    /** 写作逐维评分(作文已出分时返回;与练习批改 SubmitResultResponse.dimensions 同形状) */
+    @Schema(description = "写作逐维评分(作文已出分时返回)")
+    private List<WritingDimensionDto> writingDimensions;
+
+    /** 写作参考范文 */
+    @Schema(description = "写作参考范文(可空)")
+    private String writingSampleAnswer;
+
+    /** 写作总评 */
+    @Schema(description = "写作总评(可空)")
+    private String writingOverallComment;
 }

@@ -37,6 +37,25 @@
       </ul>
     </n-card>
 
+    <!-- 作文批改详情(写作已出分时才有;此前后端不下发,学生只看到一个分数) -->
+    <n-card v-if="report.writingGraded" :bordered="false" title="作文批改">
+      <p class="writing-score">得分 {{ report.writingScore }}</p>
+      <ul v-if="report.writingDimensions?.length" class="writing-dims">
+        <li v-for="dim in report.writingDimensions" :key="dim.name" class="writing-dims__item">
+          <span class="writing-dims__name">{{ dim.name }}</span>
+          <span class="writing-dims__score">{{ dim.score }}</span>
+          <p v-if="dim.comment" class="writing-dims__comment">{{ dim.comment }}</p>
+        </li>
+      </ul>
+      <p v-if="report.writingOverallComment" class="writing-comment">
+        <b>总评:</b>{{ report.writingOverallComment }}
+      </p>
+      <details v-if="report.writingSampleAnswer" class="writing-sample">
+        <summary>参考范文</summary>
+        <p>{{ report.writingSampleAnswer }}</p>
+      </details>
+    </n-card>
+
     <!-- 薄弱项 -->
     <n-card :bordered="false" title="薄弱项">
       <ul class="weak-points">
@@ -205,5 +224,57 @@ function partName(type: PracticeType): string {
   font-size: 13px;
   color: var(--lc-text-2);
   font-variant-numeric: tabular-nums;
+}
+
+.writing-score {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.writing-dims {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.writing-dims__item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--lc-border, rgba(128, 128, 128, 0.2));
+}
+
+.writing-dims__name {
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.writing-dims__score {
+  font-size: 13px;
+  color: var(--lc-primary, #2080f0);
+}
+
+.writing-dims__comment {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  opacity: 0.86;
+}
+
+.writing-comment {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.writing-sample {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.writing-sample p {
+  margin: 6px 0 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
 }
 </style>
