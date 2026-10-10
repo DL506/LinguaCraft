@@ -4,6 +4,7 @@ import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.dto.admin.AdminVocabBookDto;
 import com.linguacraft.backend.dto.admin.AdminWordDto;
 import com.linguacraft.backend.dto.admin.VocabBookUpsertRequest;
+import com.linguacraft.backend.dto.admin.WordImportResultDto;
 import com.linguacraft.backend.dto.admin.WordUpsertRequest;
 import com.linguacraft.backend.entity.VocabBook;
 import com.linguacraft.backend.entity.VocabWord;
@@ -28,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -69,6 +71,13 @@ class AdminVocabServiceTest {
         book.setTotal(declaredTotal);
         book.setSortOrder(10);
         return book;
+    }
+
+    /** 造一条单词(id + 拼写都填,批量导入会分别扫这两列) */
+    private VocabWord seeded(String id, String spelling) {
+        VocabWord word = word(id);
+        word.setSpelling(spelling);
+        return word;
     }
 
     private VocabWord word(String id) {
@@ -253,5 +262,105 @@ class AdminVocabServiceTest {
         assertThat(dto.getLearnedUserCount()).isEqualTo(2);
         verify(progressMapper).selectCount(any());
         verify(reviewMapper).selectCount(any());
+    }
+
+    // ==================== CSV 批量导入 ====================
+
+    private static final String CSV_HEADER = "spelling,phonetic,part_of_speech,meanings,level";
+    /** 行分隔符用系统值:解析器会先归一 CRLF */
+    private static final String NL = System.lineSeparator();
+    /** CSV 里的引号字符,避免在 Java 字符串里再套转义 */
+    private static final char QUOTE = '"';
+
+    /** 导入桩:库里已有 w-206(abandon),所以新词从 w-207 起 */
+    private void stubImportScan() {
+        when(wordMapper.selectList(any())).thenReturn(List.of(seeded("w-206", "abandon")));
+        when(wordMapper.insert(any(VocabWord.class))).thenReturn(1);
+    }
+
+    @Test
+    @DisplayName("导入两行新词:ID 顺延且补零,重复与非法均为 0")
+    void importsValidRows() {
+        stubImportScan();
+
+        WordImportResultDto result = newService().importWords(CSV_HEADER + NL
+                + "believe,/bɪˈliːv/,v.,相信,core" + NL
+                + QUOTE + "bear, 承担" + QUOTE + ",/beə(r)/,v.,承担;忍受,HIGH");
+
+        assertThat(result.getTotal()).isEqualTo(2);
+        assertThat(result.getInserted()).isEqualTo(2);
+        assertThat(result.getSkippedDuplicate()).isZero();
+        assertThat(result.getSkippedInvalid()).isZero();
+        ArgumentCaptor<VocabWord> captor = ArgumentCaptor.forClass(VocabWord.class);
+        verify(wordMapper, times(2)).insert(captor.capture());
+        assertThat(captor.getAllValues().get(0).getId()).isEqualTo("w-207");
+        assertThat(captor.getAllValues().get(1).getId()).isEqualTo("w-208");
+        // 引号内的逗号不切列;等级归一为小写
+        assertThat(captor.getAllValues().get(1).getSpelling()).isEqualTo("bear, 承担");
+        assertThat(captor.getAllValues().get(1).getLevel()).isEqualTo("high");
+    }
+
+    @Test
+    @DisplayName("与库中已有拼写重复即跳过,不覆盖")
+    void skipsDuplicateAgainstDatabase() {
+        stubImportScan();
+
+        WordImportResultDto result = newService().importWords(CSV_HEADER + NL
+                + "ABANDON,/x/,v.,放弃,core" + NL
+                + "brand-new,/y/,v.,新的,core");
+
+        assertThat(result.getSkippedDuplicate()).isEqualTo(1);
+        assertThat(result.getInserted()).isEqualTo(1);
+        verify(wordMapper, never()).updateById(any(VocabWord.class));
+    }
+
+    @Test
+    @DisplayName("同一文件内自重复只入库一次")
+    void skipsDuplicateWithinFile() {
+        stubImportScan();
+
+        WordImportResultDto result = newService().importWords(CSV_HEADER + NL
+                + "arrive,/əˈraɪv/,v.,到达,core" + NL
+                + "arrive,/əˈraɪv/,v.,到达,core");
+
+        assertThat(result.getInserted()).isEqualTo(1);
+        assertThat(result.getSkippedDuplicate()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("等级非法的行计入 skippedInvalid 并带行号原因")
+    void reportsInvalidLevel() {
+        stubImportScan();
+
+        WordImportResultDto result = newService().importWords(CSV_HEADER + NL
+                + "okword,/o/,v.,可以,core" + NL
+                + "badword,/b/,v.,不行,senior");
+
+        assertThat(result.getInserted()).isEqualTo(1);
+        assertThat(result.getSkippedInvalid()).isEqualTo(1);
+        assertThat(result.getErrors()).anySatisfy(error -> {
+            assertThat(error.getLine()).isEqualTo(3);
+            assertThat(error.getReason()).contains("level 仅接受 high/core/cognitive");
+        });
+    }
+
+    @Test
+    @DisplayName("表头缺列时整单不入库并回报原因")
+    void rejectsImportWithoutHeader() {
+        WordImportResultDto result = newService().importWords("a,b" + NL + "1,2");
+
+        assertThat(result.getInserted()).isZero();
+        assertThat(result.getTotal()).isZero();
+        assertThat(result.getErrors().get(0).getReason()).contains("CSV 表头必须包含");
+        verify(wordMapper, never()).insert(any(VocabWord.class));
+    }
+
+    @Test
+    @DisplayName("空文件直接回报,不查库")
+    void rejectsEmptyFile() {
+        WordImportResultDto result = newService().importWords("   ");
+
+        assertThat(result.getInserted()).isZero();
+        assertThat(result.getErrors().get(0).getReason()).isEqualTo("文件为空");
     }
 }

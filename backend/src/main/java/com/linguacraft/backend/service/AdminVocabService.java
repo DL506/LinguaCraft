@@ -9,6 +9,7 @@ import com.linguacraft.backend.common.ResultCode;
 import com.linguacraft.backend.dto.admin.AdminVocabBookDto;
 import com.linguacraft.backend.dto.admin.AdminWordDto;
 import com.linguacraft.backend.dto.admin.VocabBookUpsertRequest;
+import com.linguacraft.backend.dto.admin.WordImportResultDto;
 import com.linguacraft.backend.dto.admin.WordUpsertRequest;
 import com.linguacraft.backend.entity.Favorite;
 import com.linguacraft.backend.entity.UserWordProgress;
@@ -27,7 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -61,6 +64,12 @@ public class AdminVocabService {
 
     /** 单词 ID 的数字后缀样式(w-001 / w-12) */
     private static final Pattern WORD_ID_SUFFIX = Pattern.compile("^(w-)?(\\d+)$");
+
+    /** 单次导入的数据行上限 */
+    private static final int MAX_IMPORT_ROWS = 2000;
+
+    /** 导入结果里最多回报的错误条数 */
+    private static final int MAX_IMPORT_ERRORS = 50;
 
     private final VocabBookMapper bookMapper;
     private final VocabWordMapper wordMapper;
@@ -286,6 +295,104 @@ public class AdminVocabService {
         log.info("管理端删除单词: id={}", id);
     }
 
+    // ==================== 批量导入 ====================
+
+    /**
+     * CSV 批量导入单词(POST /api/admin/vocab/words/import)。
+     *
+     * <p>失败语义:行级问题跳过并回报,有效行照常入库 —— 一条坏数据不应该回滚前面一千九百条。
+     * 重复判定 = 库里已有同拼写(大小写无关)<b>或</b>本文件前面行已出现过;重复一律跳过而非覆盖,
+     * 以免误改已有关联学习记录的词条。</p>
+     *
+     * @param csvText CSV 全文(UTF-8 解码后)
+     * @return 导入结果
+     */
+    @Transactional
+    public WordImportResultDto importWords(String csvText) {
+        CsvWordParser.Result parsed = CsvWordParser.parse(csvText, MAX_IMPORT_ROWS);
+        List<WordImportResultDto.RowError> errors = new ArrayList<>();
+        for (String message : parsed.errors()) {
+            errors.add(WordImportResultDto.RowError.builder().line(0).spelling(null).reason(message).build());
+        }
+
+        // 结构不合规则直接返回(表头错误的行号无意义)
+        if (parsed.rows().isEmpty()) {
+            return WordImportResultDto.builder()
+                    .total(0).inserted(0).skippedDuplicate(0).skippedInvalid(parsed.errors().size())
+                    .errors(capErrors(errors)).truncated(parsed.truncated()).build();
+        }
+
+        Set<String> existing = lowerSpellings();
+        long[] idState = scanWordIdState();
+        int inserted = 0;
+        int duplicate = 0;
+        int invalid = 0;
+        for (CsvWordParser.Row row : parsed.rows()) {
+            String lower = row.spelling().toLowerCase(Locale.ROOT);
+            if (!VALID_LEVELS.contains(row.level())) {
+                invalid++;
+                errors.add(WordImportResultDto.RowError.builder()
+                        .line(row.line()).spelling(row.spelling())
+                        .reason("level 仅接受 high/core/cognitive,当前为 " + row.level()).build());
+                continue;
+            }
+            if (existing.contains(lower)) {
+                duplicate++;
+                errors.add(WordImportResultDto.RowError.builder()
+                        .line(row.line()).spelling(row.spelling()).reason("拼写已存在,跳过(不覆盖已有词条)").build());
+                continue;
+            }
+            VocabWord word = new VocabWord();
+            word.setId(formatWordId(idState[0] + 1 + inserted, (int) idState[1]));
+            word.setSpelling(row.spelling());
+            word.setPhonetic(row.phonetic());
+            word.setPartOfSpeech(row.partOfSpeech());
+            word.setMeanings(writeJson(row.meanings()));
+            word.setLevel(row.level());
+            wordMapper.insert(word);
+            // 文件内自重复也要跳过:把刚入库的拼写加入集合
+            existing.add(lower);
+            inserted++;
+        }
+
+        log.info("管理端 CSV 导入: 入库 {} 条,重复 {} 条,非法 {} 条", inserted, duplicate, invalid);
+        return WordImportResultDto.builder()
+                .total(parsed.dataRows())
+                .inserted(inserted)
+                .skippedDuplicate(duplicate)
+                .skippedInvalid(invalid)
+                .errors(capErrors(errors))
+                .truncated(parsed.truncated())
+                .build();
+    }
+
+    /**
+     * 错误清单截断到前 50 条(整份文件可能有几千行坏数据,全量回报会撑爆响应)。
+     *
+     * @param errors 全部错误
+     * @return 截断后的错误
+     */
+    private List<WordImportResultDto.RowError> capErrors(List<WordImportResultDto.RowError> errors) {
+        return errors.size() <= MAX_IMPORT_ERRORS
+                ? errors
+                : new ArrayList<>(errors.subList(0, MAX_IMPORT_ERRORS));
+    }
+
+    /**
+     * 库中已有拼写的小写集合。
+     *
+     * @return 拼写集合
+     */
+    private Set<String> lowerSpellings() {
+        Set<String> result = new HashSet<>();
+        for (VocabWord word : wordMapper.selectList(Wrappers.<VocabWord>lambdaQuery().select(VocabWord::getSpelling))) {
+            if (word.getSpelling() != null) {
+                result.add(word.getSpelling().toLowerCase(Locale.ROOT));
+            }
+        }
+        return result;
+    }
+
     // ==================== 校验与工具 ====================
 
     /**
@@ -297,6 +404,16 @@ public class AdminVocabService {
      * @return 新 ID
      */
     private String nextWordId() {
+        long[] state = scanWordIdState();
+        return formatWordId(state[0] + 1, (int) state[1]);
+    }
+
+    /**
+     * 扫一遍现有单词 ID,得到最大数字后缀与当前位宽。
+     *
+     * @return long[0]=最大值,long[1]=位宽(至少 3)
+     */
+    private long[] scanWordIdState() {
         long max = 0;
         int width = 3;
         for (VocabWord word : wordMapper.selectList(Wrappers.<VocabWord>lambdaQuery().select(VocabWord::getId))) {
@@ -309,7 +426,18 @@ public class AdminVocabService {
                 width = Math.max(width, matcher.group(2).length());
             }
         }
-        return "w-" + String.format("%0" + width + "d", max + 1);
+        return new long[]{max, width};
+    }
+
+    /**
+     * 按位宽补零生成单词 ID。
+     *
+     * @param value 数字部分
+     * @param width 位宽
+     * @return 形如 w-021 的 ID
+     */
+    private String formatWordId(long value, int width) {
+        return "w-" + String.format("%0" + width + "d", value);
     }
 
     /**

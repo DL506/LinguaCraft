@@ -19,6 +19,12 @@ spring:
     password: ${LC_DB_PASSWORD:00000721}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  # ===== 文件上传(阶段 A6 CSV 导入;上限与 AdminVocabService.MAX_IMPORT_ROWS 的量级匹配)=====
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   # ===== JSON 序列化:统一时区,时间字段输出 ISO-8601 =====
   jackson:
     time-zone: Asia/Shanghai

@@ -18,6 +18,24 @@ function handleUnauthorized(): never {
 }
 
 /**
+ * 解包统一响应体:code 0 返回 data;401 走登出;其余弹错并抛出。
+ * 由 request 与 upload 共用,避免两条链路的错误处理漂移。
+ *
+ * @param res fetch 响应
+ */
+async function unwrap<T>(res: Response): Promise<T> {
+  if (res.status === 401) handleUnauthorized()
+
+  const body = (await res.json()) as ApiResponse<T>
+  if (body.code === 401) handleUnauthorized()
+  if (body.code !== 0) {
+    message.error(body.message || '请求失败')
+    throw new Error(body.message)
+  }
+  return body.data
+}
+
+/**
  * 发起请求并解包 data:
  * - 自动携带 Authorization: Bearer <token>
  * - code === 0 返回 data;code !== 0 弹 n-message.error 并抛错(验收 40)
@@ -36,15 +54,29 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     message.error('网络异常,请稍后重试')
     throw new Error('network error')
   }
-  if (res.status === 401) handleUnauthorized()
+  return unwrap<T>(res)
+}
 
-  const body = (await res.json()) as ApiResponse<T>
-  if (body.code === 401) handleUnauthorized()
-  if (body.code !== 0) {
-    message.error(body.message || '请求失败')
-    throw new Error(body.message)
+/**
+ * 文件上传(multipart/form-data):刻意<b>不设 Content-Type</b> ——
+ * 浏览器必须自己生成带 boundary 的头,手工设成 application/json 会让服务端解不出文件。
+ *
+ * @param path 接口路径(不含 /api 前缀)
+ * @param form 已放好 file 等字段的 FormData
+ */
+export async function upload<T>(path: string, form: FormData): Promise<T> {
+  const headers = new Headers()
+  const token = getToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { method: 'POST', body: form, headers })
+  } catch {
+    message.error('网络异常,请稍后重试')
+    throw new Error('network error')
   }
-  return body.data
+  return unwrap<T>(res)
 }
 
 /** GET */

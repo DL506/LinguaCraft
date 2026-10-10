@@ -47,8 +47,33 @@
             @clear="reloadWords"
           />
           <n-button size="small" @click="reloadWords">查询</n-button>
+          <n-button size="small" :loading="importing" @click="pickCsv">导入 CSV</n-button>
+          <input
+            ref="csvInput"
+            type="file"
+            accept=".csv,text/csv"
+            class="vocab__file"
+            @change="onCsvPicked"
+          />
           <span class="vocab__count">共 {{ wordTotal }} 个单词</span>
         </div>
+
+        <!-- 导入结果:重复与非法都是"跳过并回报",不阻断其余行入库 -->
+        <n-alert
+          v-if="importResult"
+          :type="importResult.skippedInvalid || importResult.skippedDuplicate ? 'warning' : 'success'"
+          :show-icon="false"
+          class="vocab__notice"
+        >
+          导入完成:读到 {{ importResult.total }} 行,入库 {{ importResult.inserted }} 条,
+          重复跳过 {{ importResult.skippedDuplicate }} 条,非法跳过 {{ importResult.skippedInvalid }} 条。
+          <ul v-if="importResult.errors?.length" class="vocab__errors">
+            <li v-for="(err, index) in importResult.errors" :key="index">
+              {{ err.line ? `第 ${err.line} 行` : '文件' }}{{ err.spelling ? `「${err.spelling}」` : '' }}:{{ err.reason }}
+            </li>
+          </ul>
+          <p v-if="importResult.truncated" class="vocab__hint">错误清单已截断,只列前 50 条。</p>
+        </n-alert>
         <n-data-table
           :columns="wordColumns"
           :data="words"
@@ -148,11 +173,12 @@ import {
   deleteAdminWord,
   getAdminVocabBooks,
   getAdminWords,
+  importAdminWords,
   syncAdminVocabBookTotal,
   updateAdminVocabBook,
   updateAdminWord,
 } from '@/api/admin'
-import type { AdminVocabBook, AdminWord } from '@/types/admin'
+import type { AdminVocabBook, AdminWord, WordImportResult } from '@/types/admin'
 
 const message = useMessage()
 const PAGE_SIZE = 20
@@ -503,6 +529,34 @@ async function onDeleteWord(row: AdminWord): Promise<void> {
   }
 }
 
+/** CSV 导入:用隐藏 file input 而非 n-upload,少一层自定义请求适配 */
+const csvInput = ref<HTMLInputElement | null>(null)
+const importing = ref(false)
+const importResult = ref<WordImportResult | null>(null)
+
+function pickCsv(): void {
+  csvInput.value?.click()
+}
+
+async function onCsvPicked(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  importing.value = true
+  try {
+    importResult.value = await importAdminWords(file)
+    message.success(`导入完成:入库 ${importResult.value.inserted} 条`)
+    void fetchWords()
+    void fetchBooks()
+  } catch {
+    /* 表头缺列、文件为空等由 request 层弹出 */
+  } finally {
+    importing.value = false
+    // 允许连续导入同一文件(否则 change 不再触发)
+    input.value = ''
+  }
+}
+
 onMounted(() => {
   void fetchBooks()
   void fetchWords()
@@ -537,6 +591,23 @@ onMounted(() => {
 .vocab__count {
   font-size: 12px;
   opacity: 0.7;
+}
+
+.vocab__file {
+  display: none;
+}
+
+.vocab__errors {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.vocab__hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  opacity: 0.75;
 }
 
 .vocab__add {

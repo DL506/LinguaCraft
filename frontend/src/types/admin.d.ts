@@ -341,3 +341,19 @@ export interface WordPayload {
   realExamSource?: string
   audioUrl?: string
 }
+
+/** CSV 批量导入结果(POST /api/admin/vocab/words/import) */
+export interface WordImportResult {
+  /** 读到的数据行总数(不含表头) */
+  total: number
+  /** 入库数 */
+  inserted: number
+  /** 拼写重复(库中已有或文件内先前)跳过数 */
+  skippedDuplicate: number
+  /** 字段非法跳过数 */
+  skippedInvalid: number
+  /** 错误明细(最多 50 条) */
+  errors?: { line: number; spelling?: string; reason: string }[]
+  /** 错误清单是否被截断 */
+  truncated?: boolean
+}

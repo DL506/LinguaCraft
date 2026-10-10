@@ -1,7 +1,7 @@
 // 后台管理端 API 封装(阶段 A1 起):全部走 /api/admin/**
 // 说明:管理端接口刻意不注册 MSW handler —— main.ts 配置 onUnhandledRequest: 'bypass',
 //       未匹配路径直连真实后端,因此后台功能只在接真实后端时可用(演示 mock 模式下面向的是学生端)。
-import { del, get, patch, post, put } from './request'
+import { del, get, patch, post, put, upload } from './request'
 import type {
   AdminPing,
   AdminDashboard,
@@ -19,6 +19,7 @@ import type {
   ExamWritingGradePayload,
   ManualGradePayload,
   VocabBookPayload,
+  WordImportResult,
   WordPayload,
 } from '@/types/admin'
 import type { PageResult } from '@/types/api'
@@ -107,6 +108,13 @@ export function updateAdminWord(id: string, payload: WordPayload): Promise<Admin
 /** 删除单词(有学习记录或收藏时服务端拒绝) */
 export function deleteAdminWord(id: string): Promise<null> {
   return del<null>(`/admin/vocab/words/${encodeURIComponent(id)}`)
+}
+
+/** CSV 批量导入单词(行级失败跳过并回报;重复拼写不覆盖) */
+export function importAdminWords(file: File): Promise<WordImportResult> {
+  const form = new FormData()
+  form.append('file', file)
+  return upload<WordImportResult>('/admin/vocab/words/import', form)
 }
 
 /** 调整角色(只接受 student/admin;不许给自己降权) */

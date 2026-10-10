@@ -1,10 +1,13 @@
 package com.linguacraft.backend.controller;
 
+import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.common.PageResult;
 import com.linguacraft.backend.common.R;
+import com.linguacraft.backend.common.ResultCode;
 import com.linguacraft.backend.dto.admin.AdminVocabBookDto;
 import com.linguacraft.backend.dto.admin.AdminWordDto;
 import com.linguacraft.backend.dto.admin.VocabBookUpsertRequest;
+import com.linguacraft.backend.dto.admin.WordImportResultDto;
 import com.linguacraft.backend.dto.admin.WordUpsertRequest;
 import com.linguacraft.backend.service.AdminVocabService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,7 +25,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -174,6 +180,28 @@ public class AdminVocabController {
             @Parameter(description = "单词 ID", required = true) @PathVariable("id") String id,
             @Valid @RequestBody WordUpsertRequest request) {
         return R.ok(adminVocabService.saveWord(id, request));
+    }
+
+    /**
+     * CSV 批量导入单词。
+     *
+     * @param file 上传的 CSV 文件(UTF-8)
+     * @return 统一响应:data 为导入结果
+     */
+    @Operation(summary = "CSV 批量导入单词",
+            description = "表头须含 spelling,phonetic,part_of_speech,meanings,level;行级问题跳过并回报,重复拼写不覆盖已有词条;上限 2000 行")
+    @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功,code=400 文件为空或读取失败")
+    @PostMapping("/words/import")
+    public R<WordImportResultDto> importWords(
+            @Parameter(description = "CSV 文件(UTF-8)", required = true) @RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(), "请选择要导入的 CSV 文件");
+        }
+        try {
+            return R.ok(adminVocabService.importWords(new String(file.getBytes(), StandardCharsets.UTF_8)));
+        } catch (IOException e) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(), "文件读取失败:" + e.getMessage());
+        }
     }
 
     /**
