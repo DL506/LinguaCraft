@@ -357,3 +357,41 @@ export interface WordImportResult {
   /** 错误清单是否被截断 */
   truncated?: boolean
 }
+
+/** 管理端语法节点行(GET /api/admin/grammar/nodes;平铺,前端按 parentId 组装) */
+export interface AdminGrammarNode {
+  id: string
+  name: string
+  /** 父节点 ID;空为顶层 */
+  parentId?: string | null
+  sortOrder?: number
+  /** 有子节点即为目录 */
+  hasChildren: boolean
+  /** 是否已有正文(新建叶节点时后端自动补占位) */
+  hasSection: boolean
+  sectionTitle?: string
+}
+
+/** 节点新建/更新请求 */
+export interface GrammarNodePayload {
+  name: string
+  parentId?: string | null
+  sortOrder?: number
+}
+
+/** 管理端语法章节(GET/PUT /api/admin/grammar/sections/{nodeId}) */
+export interface AdminGrammarSection {
+  id: string
+  nodeId: string
+  title: string
+  markdown: string
+  sortOrder?: number
+  updatedAt?: string
+}
+
+/** 章节正文请求 */
+export interface GrammarSectionPayload {
+  title: string
+  markdown: string
+  sortOrder?: number
+}

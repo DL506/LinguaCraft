@@ -150,6 +150,11 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/Vocab.vue'),
         meta: { title: '词书与单词', section: 'admin' },
       },
+      {
+        path: 'grammar',
+        component: () => import('@/views/admin/Grammar.vue'),
+        meta: { title: '语法管理', section: 'admin' },
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

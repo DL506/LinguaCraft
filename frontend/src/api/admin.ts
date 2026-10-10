@@ -7,6 +7,8 @@ import type {
   AdminDashboard,
   AdminExamSubmissionDetail,
   AdminExamSubmissionListItem,
+  AdminGrammarNode,
+  AdminGrammarSection,
   AdminQuestionDetail,
   AdminQuestionListItem,
   AdminQuestionPayload,
@@ -17,6 +19,8 @@ import type {
   AdminVocabBook,
   AdminWord,
   ExamWritingGradePayload,
+  GrammarNodePayload,
+  GrammarSectionPayload,
   ManualGradePayload,
   VocabBookPayload,
   WordImportResult,
@@ -115,6 +119,45 @@ export function importAdminWords(file: File): Promise<WordImportResult> {
   const form = new FormData()
   form.append('file', file)
   return upload<WordImportResult>('/admin/vocab/words/import', form)
+}
+
+/** 语法节点平铺列表 */
+export function getAdminGrammarNodes(): Promise<AdminGrammarNode[]> {
+  return get<AdminGrammarNode[]>('/admin/grammar/nodes')
+}
+
+/** 新建语法节点(后端同事务补占位正文) */
+export function createAdminGrammarNode(payload: GrammarNodePayload): Promise<AdminGrammarNode> {
+  return post<AdminGrammarNode>('/admin/grammar/nodes', payload)
+}
+
+/** 更新语法节点(改父节点时后端做环检测) */
+export function updateAdminGrammarNode(id: string, payload: GrammarNodePayload): Promise<AdminGrammarNode> {
+  return put<AdminGrammarNode>(`/admin/grammar/nodes/${encodeURIComponent(id)}`, payload)
+}
+
+/** 整层重排:按给定 ID 顺序重编该层 sortOrder */
+export function reorderAdminGrammarNodes(parentId: string | undefined, ids: string[]): Promise<AdminGrammarNode[]> {
+  const query = parentId ? `?parentId=${encodeURIComponent(parentId)}` : ''
+  return put<AdminGrammarNode[]>(`/admin/grammar/nodes/reorder${query}`, ids)
+}
+
+/** 删除语法节点(连带动正文;有子节点会被拒) */
+export function deleteAdminGrammarNode(id: string): Promise<null> {
+  return del<null>(`/admin/grammar/nodes/${encodeURIComponent(id)}`)
+}
+
+/** 读取章节正文 */
+export function getAdminGrammarSection(nodeId: string): Promise<AdminGrammarSection> {
+  return get<AdminGrammarSection>(`/admin/grammar/sections/${encodeURIComponent(nodeId)}`)
+}
+
+/** 保存章节正文 */
+export function updateAdminGrammarSection(
+  nodeId: string,
+  payload: GrammarSectionPayload
+): Promise<AdminGrammarSection> {
+  return put<AdminGrammarSection>(`/admin/grammar/sections/${encodeURIComponent(nodeId)}`, payload)
 }
 
 /** 调整角色(只接受 student/admin;不许给自己降权) */
