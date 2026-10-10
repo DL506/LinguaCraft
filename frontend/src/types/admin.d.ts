@@ -1,8 +1,7 @@
 // 后台管理端类型(阶段 A1 起):与后端 /api/admin/** 响应一一对应
 import type { PracticeType } from './practice'
 
-/** 管理端权限探针响应(GET /api/admin/ping) */
-export interface AdminPing {
+/** 管理端权限探针响应(GET /api/admin/ping) */export interface AdminPing {
   /** 当前管理员 ID(后端 Long 经全局序列化为字符串) */
   userId: string
   /** 角色:能拿到响应即为 admin */
@@ -198,4 +197,54 @@ export interface ExamWritingGradePayload {
   score?: number
   sampleAnswer?: string
   overallComment?: string
+}
+
+/**
+ * 运营看板概览(GET /api/admin/dashboard)
+ *
+ * 后端刻意用基本类型数字下发,避免全局 Long->String 规则把计数变成字符串。
+ */
+export interface AdminDashboard {
+  /** 上架(学生可见)题目数 */
+  questionOnline: number
+  /** 题目总数(含下架) */
+  questionTotal: number
+  /** 今日新增题目数 */
+  questionCreatedToday: number
+  /** AI 生成题目数 */
+  questionAiTotal: number
+  /** 练习待批改数(与学生端 stats.pendingGradingCount 同口径) */
+  practicePending: number
+  /** 模考整卷待批改数 */
+  examPending: number
+  /** 模考作文待判数(客观分已出、写作未出分) */
+  examWritingUngraded: number
+  /** 练习待批改里最久的等待分钟数 */
+  practiceOldestPendingMinutes: number
+  /** 账号总数 */
+  userTotal: number
+  /** 已停用账号数 */
+  userDisabled: number
+  /** 管理员账号数 */
+  userAdmin: number
+  /** 今日练习提交数(created_at 口径) */
+  submissionPracticeToday: number
+  /** 今日模考交卷数 */
+  submissionExamToday: number
+  /** 全站已学长词数 */
+  wordLearnedTotal: number
+  /** 今日新学长词数 */
+  wordLearnedToday: number
+  /** 今日复习次数 */
+  wordReviewedToday: number
+  /** 词库单词总数 */
+  vocabWordTotal: number
+  /** 词书数量 */
+  vocabBookTotal: number
+  /** 语法章节数 */
+  grammarSectionTotal: number
+  /** 真题卷数量 */
+  examPaperTotal: number
+  /** 错题本条目数 */
+  mistakeTotal: number
 }

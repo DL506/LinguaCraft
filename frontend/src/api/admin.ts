@@ -4,6 +4,7 @@
 import { del, get, patch, post, put } from './request'
 import type {
   AdminPing,
+  AdminDashboard,
   AdminExamSubmissionDetail,
   AdminExamSubmissionListItem,
   AdminQuestionDetail,
@@ -20,6 +21,11 @@ import type { PracticeType } from '@/types/practice'
 /** 权限探针:验证管理员令牌能打通 /api/admin/**(学生令牌会得到 code 403) */
 export function getAdminPing(): Promise<AdminPing> {
   return get<AdminPing>('/admin/ping')
+}
+
+/** 运营看板概览(纯计数聚合;「今日」与学生端统计同为 created_at 口径) */
+export function getAdminDashboard(): Promise<AdminDashboard> {
+  return get<AdminDashboard>('/admin/dashboard')
 }
 
 /** 题库分页列表(管理端视角:含下架题与引用数) */
