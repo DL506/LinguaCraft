@@ -3,14 +3,13 @@
   <div>
     <h2 class="admin-title">运营概览</h2>
 
-    <n-alert v-if="error" type="error" :show-icon="false" class="admin-alert">
-      管理端接口调用失败:{{ error }}
-      <template #default>
-        <div class="admin-alert__hint">
-          请确认后端已启动(8080)、当前登录账号为管理员(admin/123456),且已关闭 MSW
-          (frontend/.env.development.local 写 VITE_USE_MOCK=false)。
-        </div>
-      </template>
+    <!-- 错误提示:文本与子内容统一放在默认插槽里(不能同时写直接文本与 template #default,否则 Vue 编译器报 Extraneous children) -->
+    <n-alert v-if="error" type="error" :show-icon="false" title="管理端接口调用失败" class="admin-alert">
+      {{ error }}
+      <div class="admin-alert__hint">
+        请确认后端已启动(8080)、当前登录账号为管理员(admin/123456),且已关闭 MSW
+        (frontend/.env.development.local 写 VITE_USE_MOCK=false)。
+      </div>
     </n-alert>
 
     <n-spin :show="loading">
