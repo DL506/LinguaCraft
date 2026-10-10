@@ -203,8 +203,7 @@ export interface ExamWritingGradePayload {
  * 运营看板概览(GET /api/admin/dashboard)
  *
  * 后端刻意用基本类型数字下发,避免全局 Long->String 规则把计数变成字符串。
- */
-export interface AdminDashboard {
+ */export interface AdminDashboard {
   /** 上架(学生可见)题目数 */
   questionOnline: number
   /** 题目总数(含下架) */
@@ -247,4 +246,45 @@ export interface AdminDashboard {
   examPaperTotal: number
   /** 错题本条目数 */
   mistakeTotal: number
+}
+
+/** 管理端用户列表项(GET /api/admin/users) */
+export interface AdminUserListItem {
+  id: number
+  username: string
+  nickname?: string
+  email?: string
+  role: 'student' | 'admin'
+  enabled: boolean
+  level?: number
+  levelName?: string
+  continuousDays?: number
+  totalStudyDays?: number
+  submissionCount: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+/** 管理端用户详情(GET /api/admin/users/{id};后端永不返回密码) */
+export interface AdminUserDetail {
+  id: number
+  username: string
+  nickname?: string
+  email?: string
+  avatar?: string
+  role: 'student' | 'admin'
+  enabled: boolean
+  level?: number
+  levelName?: string
+  continuousDays?: number
+  totalStudyDays?: number
+  submissionCount: number
+  pendingSubmissionCount: number
+  examSubmissionCount: number
+  mistakeCount: number
+  learnedWordCount: number
+  /** 该用户生效的批改方式偏好(来自 user_setting) */
+  gradingPreference?: string
+  createdAt?: string
+  updatedAt?: string
 }

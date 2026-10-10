@@ -99,6 +99,7 @@ export const adminNav: NavItem = {
     { key: '/admin/overview', label: '运营概览', icon: 'HomeOutline' },
     { key: '/admin/questions', label: '题库管理', icon: 'CreateOutline' },
     { key: '/admin/submissions', label: '批改工作台', icon: 'ClipboardOutline' },
+    { key: '/admin/users', label: '用户管理', icon: 'PersonOutline' },
   ],
 }
 

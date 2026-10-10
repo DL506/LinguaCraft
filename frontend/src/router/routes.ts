@@ -140,6 +140,11 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/Submissions.vue'),
         meta: { title: '批改工作台', section: 'admin' },
       },
+      {
+        path: 'users',
+        component: () => import('@/views/admin/Users.vue'),
+        meta: { title: '用户管理', section: 'admin' },
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

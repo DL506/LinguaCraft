@@ -12,6 +12,8 @@ import type {
   AdminQuestionPayload,
   AdminSubmissionDetail,
   AdminSubmissionListItem,
+  AdminUserDetail,
+  AdminUserListItem,
   ExamWritingGradePayload,
   ManualGradePayload,
 } from '@/types/admin'
@@ -26,6 +28,34 @@ export function getAdminPing(): Promise<AdminPing> {
 /** 运营看板概览(纯计数聚合;「今日」与学生端统计同为 created_at 口径) */
 export function getAdminDashboard(): Promise<AdminDashboard> {
   return get<AdminDashboard>('/admin/dashboard')
+}
+
+/** 用户列表(按注册时间倒序) */
+export function getAdminUsers(
+  params: { keyword?: string; role?: string; enabled?: boolean; page?: number; size?: number } = {}
+): Promise<PageResult<AdminUserListItem>> {
+  const query = new URLSearchParams()
+  if (params.keyword) query.set('keyword', params.keyword)
+  if (params.role) query.set('role', params.role)
+  if (params.enabled !== undefined && params.enabled !== null) query.set('enabled', String(params.enabled))
+  query.set('page', String(params.page ?? 1))
+  query.set('size', String(params.size ?? 20))
+  return get<PageResult<AdminUserListItem>>(`/admin/users?${query.toString()}`)
+}
+
+/** 用户详情(资料 + 学习量小结) */
+export function getAdminUser(id: number): Promise<AdminUserDetail> {
+  return get<AdminUserDetail>(`/admin/users/${id}`)
+}
+
+/** 启用/停用(注意:已签发令牌不受影响,停用最长 2 小时才对旧会话生效) */
+export function setAdminUserEnabled(id: number, enabled: boolean): Promise<null> {
+  return patch<null>(`/admin/users/${id}/status?enabled=${enabled}`)
+}
+
+/** 调整角色(只接受 student/admin;不许给自己降权) */
+export function setAdminUserRole(id: number, role: string): Promise<null> {
+  return patch<null>(`/admin/users/${id}/role?role=${encodeURIComponent(role)}`)
 }
 
 /** 题库分页列表(管理端视角:含下架题与引用数) */

@@ -80,6 +80,9 @@ cd backend
 - 模考作文判分(阶段 A4-②):`/api/admin/exam-submissions` 队列/材料/`POST /{id}/grade-writing`。只写写作列(`writing_score`/`writing_result`/`writing_graded_at`/`status='graded'`/`grading_method='manual'`,清空 `estimated_time`),客观分不动;
   CAS 用 `writing_graded_at IS NULL AND status<>'graded'`,与 `ExamAsyncGrader` 互斥。**写作满分取自试卷 writing section 的 score**,不是硬编码。
   两条人工批改路径的 `writing_result` 一律由 `service/WritingGradeSupport` 产出;成绩报告 `ExamReportDto` 现含 `writingDimensions`/`writingSampleAnswer`/`writingOverallComment`(此前只落库不下发)。
+- 看板与用户管理(阶段 A5):`GET /api/admin/dashboard` 出全站计数,`/api/admin/users` 出列表/详情与 `PATCH .../status`、`PATCH .../role`。
+  看板「今日」一律 `created_at >= 今日零点`(同 `HomeService` 与 `UserService.stats`,不用 `submitted_at`);`practicePending` 与学生端 `stats.pendingGradingCount` 同口径仅练习,模考欠账分列 `examPending` 与 `examWritingUngraded`;
+  DTO 计数用**基本类型**,避开全局 `Long`→字符串规则。三条护栏:不许停用自己、不许给自己降权、必须保留至少一个管理员;停用/降权**不影响已签发令牌**(过滤器只读声明,最长 2 小时)。背景见 `docs/verification/A5-运营看板与用户管理.md`。
 - **JSON 栈统一为 Jackson 3**(`tools.jackson.*`,Spring Boot 4 默认):实体主键 `Long` 由 `config/JacksonConfig` 的 `JacksonModule` Bean 全局序列化为字符串(对应前端 `id: string`)。不得再使用 `com.fasterxml.jackson.databind/core` 的类(`com.fasterxml.jackson.annotation` 注解包除外);swagger 注解包版本已在 `pom.xml` 固定为 2.2.52,勿降级。背景见 `docs/verification/S9-Jackson3启动缺陷修复.md`。
 
 ## 目录速览

@@ -190,8 +190,8 @@ const roadmap = [
   { phase: 'A2', title: '题库管理(增删改查、上下架、答案防呆校验)', status: '已交付' },
   { phase: 'A3', title: 'AI 链路加固(出题共用五道校验、判分口径、配置注入自检)', status: '已交付' },
   { phase: 'A4', title: '人工批改工作台(练习 A4 + 模考作文 A4-②)', status: '已交付' },
-  { phase: 'A5', title: '运营看板与用户管理(停用、角色调整)', status: '本阶段' },
-  { phase: 'A6', title: '内容全家桶(词书 / 单词含批量导入 / 语法 / 真题卷管理)', status: '待交付' },
+  { phase: 'A5', title: '运营看板与用户管理(停用、角色调整)', status: '已交付' },
+  { phase: 'A6', title: '内容全家桶(词书 / 单词含批量导入 / 语法 / 真题卷管理)', status: '本阶段' },
 ]
 
 async function load(): Promise<void> {
