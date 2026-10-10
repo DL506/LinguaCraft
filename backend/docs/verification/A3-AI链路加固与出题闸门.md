@@ -98,4 +98,23 @@ key 可用后要补的真实验证(批次二,尚未完成):五种题型各生成
 - AI 出题**仍默认 `status=1`**(用户确认"其余不变"):生成的题立刻进学生端。若希望管理员先过一眼,把 `AiGenerateService.buildAndPersist` 的 `setStatus(1)` 改为 0 即可,一行。
 - 闸门的真实拦截力目前由桩测试证明;模型实际产出哪些畸形结构,要等可用 key 才能统计。
 - 判分仍不落逐题分值与人工评语(`SubmitDetailDto` 只有 `id/userAnswer/correctAnswer/isCorrect/explanation`),这属于 A4 人工批改工作台的范畴。
-- 待办:①用真 key 完成批次二全量验证;②A4 人工批改工作台(闭掉"永远待批改"那条断链的人工兜底);③`ExamService.report` 不校验 `submission.userId` 的越权读需单独修。
+
+## 7. 批次二:接入真实模型后的验证(2026-10-11)
+
+换上可用 key 后,`backend/.env.local` 填 `LC_AI_API_KEY` / `LC_AI_BASE_URL=https://api.deepseek.com` / `LC_AI_MODEL=deepseek-flash`,重启后端(8081)。
+
+`GET https://api.deepseek.com/models` 返回 **`deepseek-flash | deepseek-v4-pro`**,即 `deepseek-flash` 是真实存在的模型名。另需注意**它是推理型模型**:用 8 token 预算探一次会看到 `content` 为空而 `reasoning_tokens=8`(预算全被思考吃掉);放到 800 token 后 `content` 正常返回 JSON,推理另在 `reasoning_content`。本项目没设 `max_tokens`,所以走服务端默认上限,不受这个小预算影响。
+
+| 入口 | 实测 | 结论 |
+|---|---|---|
+| AI 出题 · 五种题型 | 全部 `code=0`,耗时 6~26 秒/题;新行 `cloze-ai-mv2y0bwx`、`reading-ai-mv2y0vse`、`matching-ai-…`、`grammar-fill-ai-…`、`writing-ai-…` | 一次通过,**日志里 0 次重试**(闸门未被触发,说明产出结构合格) |
+| 闸门对真实产出的核验 | 逐行 SQL 核对:`content` 中 `"answer"` / `"explanation"` / `"sampleAnswer"` 出现次数全为 **0**,答案只落在 `answer_key`;`content.blanks/questions` 条目数与 `answer_key` 条目数**逐行相等** | "答案不下发"不变量在 AI 路径上同样成立 |
+| 作文 AI 评分 | demo 提交 `POST /api/practice/detail/writing/{id}/submit`(gradeMethod=ai)→ `status=graded method=ai score=7.5/15`,四维 `dimensions` 齐全、`sampleAnswer` 有、`overallComment` 有 | 我**故意答非所问**(题目要英语角志愿者,我写图书馆志愿者),模型准确指出「内容严重偏离题目…未说明申请理由…完全缺少请求面试和提供联系方式」→ 判分真的读了题目而不只是读语言 |
+| 模考作文异步评分 | demo 交卷 `exam-2026` → `partially_graded`(客观 48/100),约 15 秒后日志「模考作文 AI 评分完成: submissionId=1 score=7.0」,库行变 `graded` 且 `writing_graded_at` 非空、`estimated_time` 为 NULL;报告 `score=55/100`、分节得分与薄弱项正确 | 异步链路通 |
+| 无答案客观题 AI 判分(`gradeObjective`) | **当前无法从任何写入口触发**:`AdminQuestionService` 与 `AiGenerateService` 都把 `has_answer` 设为 `!(type=='writing')`,种子里 `has_answer=0` 也只有写作题 | 该分支今天是**事实上的死代码**,只在单测里验证过;要让它可用,需要允许录入"无可比对答案的客观题"(产品决策,未擅自改) |
+
+**发现的新缺口(交给 A4-② 一起做)**:`ExamReportDto` 只有 `writingScore`/`writingGraded`,**不含 `dimensions` 与 `overallComment`** —— 即使 AI 已给出逐维评语,学生成绩报告也拿不到数据。这不是"前端忘了渲染",而是后端没下发。
+
+本批产生的数据:5 道 AI 题(均 `status=1` 上架)、`practice_submission` 新增 id=4(写作,已批改)、`exam_submission` 新增 id=1(已批改,55/100)。种子里那条 `id=2` 的待批改写作件**未被触碰**,仍留给后台批改验收。
+
+待办更新:①批次二验证 ✅(本节);②A4 人工批改工作台 ✅;③`ExamService.report` 越权读 ✅(见 A4 文档第 6 节)。
