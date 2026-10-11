@@ -132,7 +132,7 @@
       </n-card>
     </n-spin>
 
-    <n-card size="small" title="后续阶段(按交付计划推进)" style="margin-top: 16px">
+    <n-card size="small" title="后台交付记录(A1–A6 已全部落地)" style="margin-top: 16px">
       <n-list hoverable>
         <n-list-item v-for="item in roadmap" :key="item.phase">
           <template #prefix><n-tag size="small" :bordered="false">{{ item.phase }}</n-tag></template>
@@ -140,6 +140,9 @@
           <template #suffix><span class="admin-muted">{{ item.status }}</span></template>
         </n-list-item>
       </n-list>
+      <p class="admin-muted roadmap-note">
+        未纳入本轮:AI 预评按钮与 AI 出题复核队列、趋势图表、账号删除与密码重置、整卷复制与 AI 出整卷。
+      </p>
     </n-card>
   </div>
 </template>
@@ -191,7 +194,7 @@ const roadmap = [
   { phase: 'A3', title: 'AI 链路加固(出题共用五道校验、判分口径、配置注入自检)', status: '已交付' },
   { phase: 'A4', title: '人工批改工作台(练习 A4 + 模考作文 A4-②)', status: '已交付' },
   { phase: 'A5', title: '运营看板与用户管理(停用、角色调整)', status: '已交付' },
-  { phase: 'A6', title: '内容全家桶(词书 / 单词含批量导入 / 语法 / 真题卷管理)', status: '本阶段' },
+  { phase: 'A6', title: '内容全家桶(词书 / 单词含批量导入 / 语法 / 真题卷管理)', status: '已交付' },
 ]
 
 async function load(): Promise<void> {
@@ -236,6 +239,12 @@ onMounted(load)
 .admin-muted {
   font-size: 12px;
   opacity: 0.7;
+}
+
+/* 路线图下那行"没做什么"的说明:贴在列表底部,不复用卡片的行高 */
+.roadmap-note {
+  margin: 12px 0 0;
+  line-height: 1.6;
 }
 
 .overview-card {
