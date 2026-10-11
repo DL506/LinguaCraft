@@ -345,22 +345,36 @@ class AdminVocabServiceTest {
     }
 
     @Test
-    @DisplayName("表头缺列时整单不入库并回报原因")
+    @DisplayName("表头缺列整单拒绝(400),不返回\"导入完成 0 条\"的假成功")
     void rejectsImportWithoutHeader() {
-        WordImportResultDto result = newService().importWords("a,b" + NL + "1,2");
-
-        assertThat(result.getInserted()).isZero();
-        assertThat(result.getTotal()).isZero();
-        assertThat(result.getErrors().get(0).getReason()).contains("CSV 表头必须包含");
+        assertThatThrownBy(() -> newService().importWords("a,b" + NL + "1,2"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("CSV 表头必须包含 spelling,phonetic,part_of_speech,meanings,level");
         verify(wordMapper, never()).insert(any(VocabWord.class));
     }
 
     @Test
-    @DisplayName("空文件直接回报,不查库")
+    @DisplayName("空文件整单拒绝(400)")
     void rejectsEmptyFile() {
-        WordImportResultDto result = newService().importWords("   ");
+        assertThatThrownBy(() -> newService().importWords("   "))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("文件为空");
+    }
 
-        assertThat(result.getInserted()).isZero();
-        assertThat(result.getErrors().get(0).getReason()).isEqualTo("文件为空");
+    @Test
+    @DisplayName("字段不完整的行计入 skippedInvalid 并保留有效行")
+    void countsFieldIncompleteRowsAsInvalid() {
+        stubImportScan();
+
+        WordImportResultDto result = newService().importWords(CSV_HEADER + NL
+                + "okword,/o/,v.,可以,core" + NL
+                + "halfrow,/h/,v.,," + NL
+                + ",/n/,v.,缺拼写,core");
+
+        assertThat(result.getTotal()).isEqualTo(3);
+        assertThat(result.getInserted()).isEqualTo(1);
+        assertThat(result.getSkippedInvalid()).isEqualTo(2);
+        assertThat(result.getErrors()).anySatisfy(error ->
+                assertThat(error.getReason()).contains("行字段不完整"));
     }
 }

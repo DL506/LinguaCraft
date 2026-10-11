@@ -189,7 +189,8 @@ public class AdminVocabController {
      * @return 统一响应:data 为导入结果
      */
     @Operation(summary = "CSV 批量导入单词",
-            description = "表头须含 spelling,phonetic,part_of_speech,meanings,level;行级问题跳过并回报,重复拼写不覆盖已有词条;上限 2000 行")
+            description = "表头须含 spelling,phonetic,part_of_speech,meanings,level(缺列整单 400);"
+                    + "行级问题跳过并回报,重复拼写不覆盖已有词条;上限 2000 行,超出即截断")
     @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功,code=400 文件为空或读取失败")
     @PostMapping("/words/import")
     public R<WordImportResultDto> importWords(

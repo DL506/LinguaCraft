@@ -301,6 +301,7 @@ public class AdminVocabService {
      * CSV 批量导入单词(POST /api/admin/vocab/words/import)。
      *
      * <p>失败语义:行级问题跳过并回报,有效行照常入库 —— 一条坏数据不应该回滚前面一千九百条。
+     * 但<b>整单级</b>问题(文件为空、表头缺列)直接 400 拒绝,不留"导入完成 0 条"的假成功。
      * 重复判定 = 库里已有同拼写(大小写无关)<b>或</b>本文件前面行已出现过;重复一律跳过而非覆盖,
      * 以免误改已有关联学习记录的词条。</p>
      *
@@ -310,16 +311,14 @@ public class AdminVocabService {
     @Transactional
     public WordImportResultDto importWords(String csvText) {
         CsvWordParser.Result parsed = CsvWordParser.parse(csvText, MAX_IMPORT_ROWS);
+        // 整单级错误(文件为空 / 表头缺列)直接 400:此时"导入完成 0 条"会让管理员以为成功
+        if (parsed.fileError() != null) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(), parsed.fileError());
+        }
+
         List<WordImportResultDto.RowError> errors = new ArrayList<>();
         for (String message : parsed.errors()) {
             errors.add(WordImportResultDto.RowError.builder().line(0).spelling(null).reason(message).build());
-        }
-
-        // 结构不合规则直接返回(表头错误的行号无意义)
-        if (parsed.rows().isEmpty()) {
-            return WordImportResultDto.builder()
-                    .total(0).inserted(0).skippedDuplicate(0).skippedInvalid(parsed.errors().size())
-                    .errors(capErrors(errors)).truncated(parsed.truncated()).build();
         }
 
         Set<String> existing = lowerSpellings();
@@ -360,7 +359,7 @@ public class AdminVocabService {
                 .total(parsed.dataRows())
                 .inserted(inserted)
                 .skippedDuplicate(duplicate)
-                .skippedInvalid(invalid)
+                .skippedInvalid(invalid + parsed.rejectedRows())
                 .errors(capErrors(errors))
                 .truncated(parsed.truncated())
                 .build();

@@ -40,12 +40,15 @@ public final class CsvWordParser {
     /**
      * 整份文件的解析结果。
      *
-     * @param rows      结构合规的数据行
-     * @param errors    行级错误说明(截断由调用方负责)
-     * @param truncated 是否因超过行数上限而被截断
-     * @param dataRows  读到的数据行总数(含被拒的行,不含表头)
+     * @param rows         结构合规的数据行
+     * @param errors       行级错误说明(截断与整单拒绝的说明也写在这里,便于只读报告)
+     * @param truncated    是否因超过行数上限而被截断
+     * @param dataRows     读到的数据行总数(含被拒的行,不含表头)
+     * @param rejectedRows 因字段不完整被丢掉的行数(计入调用方的 skippedInvalid)
+     * @param fileError    整单级错误(文件为空 / 表头缺列);非空时一行都不会入库,须由调用方直接拒绝
      */
-    public record Result(List<Row> rows, List<String> errors, boolean truncated, int dataRows) {
+    public record Result(List<Row> rows, List<String> errors, boolean truncated, int dataRows,
+                         int rejectedRows, String fileError) {
     }
 
     /**
@@ -53,14 +56,14 @@ public final class CsvWordParser {
      *
      * @param text    文件全文(UTF-8 解码后)
      * @param maxRows 数据行上限(超出即截断并在错误里说明)
-     * @return 解析结果;表头缺列时 rows 为空且 errors 首条为表头错误
+     * @return 解析结果;表头缺列时 rows 为空、errors 首条为表头错误、fileError 同值
      */
     public static Result parse(String text, int maxRows) {
         List<Row> rows = new ArrayList<>();
         List<String> errors = new ArrayList<>();
         if (text == null || text.isBlank()) {
             errors.add("文件为空");
-            return new Result(rows, errors, false, 0);
+            return new Result(rows, errors, false, 0, 0, "文件为空");
         }
 
         String normalized = text.replace("\r\n", "\n").replace("\r", "\n");
@@ -76,16 +79,18 @@ public final class CsvWordParser {
         }
         if (lines.isEmpty()) {
             errors.add("文件为空");
-            return new Result(rows, errors, false, 0);
+            return new Result(rows, errors, false, 0, 0, "文件为空");
         }
 
         int[] columnIndexes = mapHeader(lines.get(0));
         if (columnIndexes == null) {
-            errors.add("CSV 表头必须包含 spelling,phonetic,part_of_speech,meanings,level");
-            return new Result(rows, errors, false, 0);
+            String reason = "CSV 表头必须包含 spelling,phonetic,part_of_speech,meanings,level";
+            errors.add(reason);
+            return new Result(rows, errors, false, 0, 0, reason);
         }
 
         boolean truncated = false;
+        int rejected = 0;
         int dataRows = Math.max(0, lines.size() - 1);
         // 表头占第 1 行,数据行从第 2 行起
         for (int i = 1; i < lines.size(); i++) {
@@ -104,12 +109,13 @@ public final class CsvWordParser {
             List<String> meanings = splitMeanings(meaningsRaw);
             if (spelling.isEmpty() || phonetic.isEmpty() || partOfSpeech.isEmpty()
                     || meanings.isEmpty() || level.isEmpty()) {
+                rejected++;
                 errors.add("第 " + (i + 1) + " 行字段不完整(拼写/音标/词性/释义/等级都不可为空)");
                 continue;
             }
             rows.add(new Row(i + 1, spelling, phonetic, partOfSpeech, meanings, level.toLowerCase(Locale.ROOT)));
         }
-        return new Result(rows, errors, truncated, dataRows);
+        return new Result(rows, errors, truncated, dataRows, rejected, null);
     }
 
     /**
