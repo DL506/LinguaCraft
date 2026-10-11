@@ -102,6 +102,7 @@ export const adminNav: NavItem = {
     { key: '/admin/users', label: '用户管理', icon: 'PersonOutline' },
     { key: '/admin/vocab', label: '词书与单词', icon: 'BookOutline' },
     { key: '/admin/grammar', label: '语法管理', icon: 'ReaderOutline' },
+    { key: '/admin/exam-papers', label: '真题卷管理', icon: 'DocumentTextOutline' },
   ],
 }
 

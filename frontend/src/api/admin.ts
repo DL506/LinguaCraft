@@ -6,6 +6,7 @@ import type {
   AdminPing,
   AdminDashboard,
   AdminExamSubmissionDetail,
+  AdminExamPaper,
   AdminExamSubmissionListItem,
   AdminGrammarNode,
   AdminGrammarSection,
@@ -18,6 +19,7 @@ import type {
   AdminUserListItem,
   AdminVocabBook,
   AdminWord,
+  ExamPaperPayload,
   ExamWritingGradePayload,
   GrammarNodePayload,
   GrammarSectionPayload,
@@ -251,4 +253,42 @@ export function gradeAdminExamWriting(
   payload: ExamWritingGradePayload
 ): Promise<AdminExamSubmissionDetail> {
   return post<AdminExamSubmissionDetail>(`/admin/exam-submissions/${id}/grade-writing`, payload)
+}
+
+/** 真题卷列表(含下架卷;每行带分值合计与交卷次数) */
+export function getAdminExamPapers(
+  params: { year?: number; status?: number; keyword?: string; page?: number; size?: number } = {}
+): Promise<PageResult<AdminExamPaper>> {
+  const query = new URLSearchParams()
+  if (params.year) query.set('year', String(params.year))
+  if (params.status !== undefined && params.status !== null) query.set('status', String(params.status))
+  if (params.keyword) query.set('keyword', params.keyword)
+  query.set('page', String(params.page ?? 1))
+  query.set('size', String(params.size ?? 20))
+  return get<PageResult<AdminExamPaper>>(`/admin/exam-papers?${query.toString()}`)
+}
+
+/** 真题卷详情(含 content 与 answer_key 两份 JSON) */
+export function getAdminExamPaper(id: string): Promise<AdminExamPaper> {
+  return get<AdminExamPaper>(`/admin/exam-papers/${encodeURIComponent(id)}`)
+}
+
+/** 新建真题卷(服务端硬校验题号与分值,不过即拒绝保存) */
+export function createAdminExamPaper(payload: ExamPaperPayload): Promise<AdminExamPaper> {
+  return post<AdminExamPaper>('/admin/exam-papers', payload)
+}
+
+/** 整卷更新 */
+export function updateAdminExamPaper(id: string, payload: ExamPaperPayload): Promise<AdminExamPaper> {
+  return put<AdminExamPaper>(`/admin/exam-papers/${encodeURIComponent(id)}`, payload)
+}
+
+/** 上架/下架(下架只停止新作答,历史成绩报告仍可读) */
+export function setAdminExamPaperStatus(id: string, status: 0 | 1): Promise<null> {
+  return patch<null>(`/admin/exam-papers/${encodeURIComponent(id)}/status?status=${status}`)
+}
+
+/** 删除真题卷(被交卷引用时服务端拒绝) */
+export function deleteAdminExamPaper(id: string): Promise<null> {
+  return del<null>(`/admin/exam-papers/${encodeURIComponent(id)}`)
 }

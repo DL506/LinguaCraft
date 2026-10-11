@@ -395,3 +395,37 @@ export interface GrammarSectionPayload {
   markdown: string
   sortOrder?: number
 }
+
+/** 管理端真题卷(GET /api/admin/exam-papers[/{id}]) */
+export interface AdminExamPaper {
+  id: string
+  year: number
+  title: string
+  totalScore: number
+  /** 各部分分值之和(与 totalScore 不等即为脏卷) */
+  sectionScoreSum: number
+  duration?: number
+  /** 1 上架 / 0 下架 */
+  status: number
+  sectionCount: number
+  objectiveItemCount: number
+  /** 交卷次数(>0 不可删除) */
+  submissionCount: number
+  /** 卷面 JSON(仅详情下发) */
+  content?: Record<string, unknown>
+  /** 答案 JSON(仅详情下发) */
+  answerKey?: Record<string, unknown>
+  createdAt?: string
+  updatedAt?: string
+}
+
+/** 真题卷新建/更新请求 */
+export interface ExamPaperPayload {
+  year: number
+  title: string
+  totalScore: number
+  duration?: number
+  status?: number
+  content: unknown
+  answerKey: unknown
+}

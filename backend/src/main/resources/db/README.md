@@ -47,6 +47,7 @@ Get-Content .\backend\src\main\resources\db\V02__create_user_auth_tables.sql -Ra
 | V07 | V07__create_favorite_table.sql | favorite 收藏表 | V01 | 是 | 已执行 |
 | S06 | S06__seed_demo_history.sql | 演示历史数据(demo:提交 3/错题 2/收藏 2/词进度 3/复习日志 2) | V03/V06/V07 | 是 | 已执行 |
 | V08 | V08__add_user_role_and_enabled.sql | user 表加 `role`(student/admin)与 `enabled` 两列 + `idx_user_role`(information_schema 判重 + PREPARE 实现幂等) | V02 | 是 | 已执行 |
+| V09 | V09__add_exam_paper_status.sql | exam_paper 加 `status`(1 上架/0 下架)+ `idx_exam_status`;默认 1,既有卷自动保持上架 | V05 | 是 | 已执行 |
 | S07 | S07__seed_admin_account.sql | 后台管理员账号 admin/123456(role=admin)及其默认设置 | V02/V08 | 是 | 已执行 |
 
 > 后续步骤新增的 V/S 脚本将在此表按序追加。

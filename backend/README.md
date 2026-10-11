@@ -83,6 +83,10 @@ cd backend
 - 看板与用户管理(阶段 A5):`GET /api/admin/dashboard` 出全站计数,`/api/admin/users` 出列表/详情与 `PATCH .../status`、`PATCH .../role`。
   看板「今日」一律 `created_at >= 今日零点`(同 `HomeService` 与 `UserService.stats`,不用 `submitted_at`);`practicePending` 与学生端 `stats.pendingGradingCount` 同口径仅练习,模考欠账分列 `examPending` 与 `examWritingUngraded`;
   DTO 计数用**基本类型**,避开全局 `Long`→字符串规则。三条护栏:不许停用自己、不许给自己降权、必须保留至少一个管理员;停用/降权**不影响已签发令牌**(过滤器只读声明,最长 2 小时)。背景见 `docs/verification/A5-运营看板与用户管理.md`。
+- 内容管理(阶段 A6):`/api/admin/vocab`(词书+单词+CSV 导入)、`/api/admin/grammar`(节点+章节)、`/api/admin/exam-papers`(真题卷+上下架)。
+  **词书是过滤器不是归属**:`vocab_book.filter_level` 按等级筛词,没有中间表,所以"改词书"=改单词 `level`;`vocab_book.total` 不自动派生,只有 `PATCH /books/{id}/sync-total` 显式对齐(自动派生会让首页数字暴跌)。
+  单词/词书/试卷的删除一律**引用保护**(命中学习记录、收藏、交卷即拒),新单词 ID 沿用 `w-` + 位宽补零,学生端列表按 `LENGTH(id), id` 排序;CSV 解析用自写 `CsvWordParser`(RFC 4180 状态机,不新增依赖),**行级失败跳过、整单级失败(空文件/表头缺列)400 拒绝**。背景见 `docs/verification/A6-内容与真题卷管理.md`。
+- 真题卷上下架(阶段 A6-③):`exam_paper.status` 由 `db/V09` 加列,默认 1。学生侧**列表/详情/作答/进度**四处按 `status=1` 过滤并拒下架卷,**但 `buildReport` 不看状态** —— 下架是停止投放,不是抹掉历史成绩。写入前必过 `ExamPaperValidator` 四条硬校验(编号集合相等、编号全卷唯一、`sum(section.score)==total_score`、恰好一个 15 分写作部分),因为编号错配的后果是**客观题静默判错**而不是报错。
 - **JSON 栈统一为 Jackson 3**(`tools.jackson.*`,Spring Boot 4 默认):实体主键 `Long` 由 `config/JacksonConfig` 的 `JacksonModule` Bean 全局序列化为字符串(对应前端 `id: string`)。不得再使用 `com.fasterxml.jackson.databind/core` 的类(`com.fasterxml.jackson.annotation` 注解包除外);swagger 注解包版本已在 `pom.xml` 固定为 2.2.52,勿降级。背景见 `docs/verification/S9-Jackson3启动缺陷修复.md`。
 
 ## 目录速览

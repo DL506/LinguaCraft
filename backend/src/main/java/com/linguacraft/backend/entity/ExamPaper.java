@@ -35,6 +35,9 @@ public class ExamPaper {
     /** 考试时长(分钟) */
     private Integer duration;
 
+    /** 上下架:1 上架(学生端可见),0 下架(V09 新增;历史提交的成绩报告不受影响) */
+    private Integer status;
+
     /** 整卷下发内容 JSON(不含答案) */
     private String content;
 

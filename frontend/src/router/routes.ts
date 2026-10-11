@@ -155,6 +155,11 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/Grammar.vue'),
         meta: { title: '语法管理', section: 'admin' },
       },
+      {
+        path: 'exam-papers',
+        component: () => import('@/views/admin/ExamPapers.vue'),
+        meta: { title: '真题卷管理', section: 'admin' },
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

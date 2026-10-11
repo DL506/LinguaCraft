@@ -117,6 +117,8 @@ public class ExamService {
         long safeSize = Math.min(Math.max(size, 1), 100);
 
         var wrapper = Wrappers.<ExamPaper>lambdaQuery()
+                // 下架的真题卷不再出现在学生端列表(阶段 A6-③)
+                .eq(ExamPaper::getStatus, 1)
                 .orderByDesc(ExamPaper::getYear)
                 .orderByDesc(ExamPaper::getId);
         if (year != null) {
@@ -160,7 +162,7 @@ public class ExamService {
      * @return 整卷(阅读 section 的 content 为 3 篇数组)
      */
     public ExamPaperDto detail(String id) {
-        ExamPaper paper = findPaper(id);
+        ExamPaper paper = findListedPaper(id);
         JsonNode sectionsNode = readTree(paper.getContent()).path("sections");
         List<ExamSectionDto> sections = new ArrayList<>();
         for (JsonNode section : sectionsNode) {
@@ -193,7 +195,7 @@ public class ExamService {
      * @return 统一提交结果(SubmitResult)
      */
     public SubmitResultResponse submit(String id, ExamSubmitRequest body) {
-        ExamPaper paper = findPaper(id);
+        ExamPaper paper = findListedPaper(id);
         if (body == null) {
             throw new BizException(ResultCode.PARAM_ERROR.getCode(), "请求体不能为空");
         }
@@ -277,7 +279,7 @@ public class ExamService {
      * @return 进度(无进度时返回 null,接口 data 为 null)
      */
     public ExamProgressResponse getProgress(String examId) {
-        findPaper(examId);
+        findListedPaper(examId);
         Long userId = SecurityUtils.getCurrentUserId();
         ExamProgress progress = progressMapper.selectOne(
                 Wrappers.<ExamProgress>lambdaQuery()
@@ -300,7 +302,7 @@ public class ExamService {
      * @param request 进度(objective/writing/duration)
      */
     public void saveProgress(String examId, ExamProgressRequest request) {
-        findPaper(examId);
+        findListedPaper(examId);
         Long userId = SecurityUtils.getCurrentUserId();
         String objectiveJson = request == null || request.getObjective() == null ? "{}" : writeJson(request.getObjective());
         String writingJson = request == null || request.getWriting() == null ? null : writeJson(request.getWriting());
@@ -593,6 +595,23 @@ public class ExamService {
      * @param id 试卷 ID
      * @return 试卷实体
      */
+    /**
+     * 学生侧取卷:存在且必须处于上架状态(阶段 A6-③)。
+     *
+     * <p>成绩报告不走这里 —— 下架只停止新的作答,已交卷的卷子仍要能查到结果,
+     * 否则历史成绩会凭空消失。</p>
+     *
+     * @param id 试卷 ID
+     * @return 试卷实体
+     */
+    private ExamPaper findListedPaper(String id) {
+        ExamPaper paper = findPaper(id);
+        if (paper.getStatus() != null && paper.getStatus() == 0) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(), "该试卷已下架");
+        }
+        return paper;
+    }
+
     private ExamPaper findPaper(String id) {
         ExamPaper paper = paperMapper.selectById(id);
         if (paper == null) {
