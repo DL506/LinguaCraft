@@ -27,6 +27,7 @@ import type {
   VocabBookPayload,
   WordImportResult,
   WordPayload,
+  WritingPreview,
 } from '@/types/admin'
 import type { PageResult } from '@/types/api'
 import type { PracticeType } from '@/types/practice'
@@ -230,6 +231,14 @@ export function gradeAdminSubmission(id: number, payload: ManualGradePayload): P
   return post<AdminSubmissionDetail>(`/admin/submissions/${id}/grade`, payload)
 }
 
+/**
+ * AI 预评练习写作件(阶段 A7):只起草不落库,不改 status。
+ * 一次调用要 7~40 秒,调用方必须给 loading 并允许重试。
+ */
+export function aiPreviewSubmission(id: number): Promise<WritingPreview> {
+  return post<WritingPreview>(`/admin/submissions/${id}/ai-preview`)
+}
+
 /** 模考批改队列(客观分交卷即算;writingGraded=false 的行才是欠着的) */
 export function getAdminExamSubmissions(
   params: { status?: string; keyword?: string; page?: number; size?: number } = {}
@@ -253,6 +262,11 @@ export function gradeAdminExamWriting(
   payload: ExamWritingGradePayload
 ): Promise<AdminExamSubmissionDetail> {
   return post<AdminExamSubmissionDetail>(`/admin/exam-submissions/${id}/grade-writing`, payload)
+}
+
+/** AI 预评模考作文(阶段 A7):给 AI 异步评分失败停在 partially_graded 的件起草,不落库 */
+export function aiPreviewExamSubmission(id: number): Promise<WritingPreview> {
+  return post<WritingPreview>(`/admin/exam-submissions/${id}/ai-preview`)
 }
 
 /** 真题卷列表(含下架卷;每行带分值合计与交卷次数) */

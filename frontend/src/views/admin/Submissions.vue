@@ -121,6 +121,20 @@
             <n-card v-if="isWriting" size="small" title="评分" class="grade__card">
               <label class="grade__label">学生作文</label>
               <div class="grade__answer">{{ writingText || '(未作答)' }}</div>
+              <div class="grade__preview">
+                <n-button size="small" type="primary" ghost :loading="previewing" @click="onAiPreview">
+                  AI 预评(起草)
+                </n-button>
+                <n-button
+                  v-if="previewSnapshot"
+                  size="small"
+                  quaternary
+                  @click="undoPreview"
+                >
+                  撤销 AI 草稿
+                </n-button>
+              </div>
+              <p v-if="previewNote" class="grade__hint">{{ previewNote }}</p>
               <div v-for="(row, index) in dimensionRows" :key="row.name" class="grade__dim">
                 <span class="grade__dim-name">{{ row.name }}</span>
                 <n-input-number v-model:value="row.score" size="small" :min="0" :max="dimensionCap" style="width: 108px" />
@@ -191,6 +205,20 @@
 
             <n-card size="small" title="学生作文与评分" class="grade__card">
               <div class="grade__answer">{{ examDetail.writingContent || '(未作答)' }}</div>
+              <div class="grade__preview">
+                <n-button size="small" type="primary" ghost :loading="examPreviewing" @click="onExamAiPreview">
+                  AI 预评(起草)
+                </n-button>
+                <n-button
+                  v-if="examPreviewSnapshot"
+                  size="small"
+                  quaternary
+                  @click="undoExamPreview"
+                >
+                  撤销 AI 草稿
+                </n-button>
+              </div>
+              <p v-if="examPreviewNote" class="grade__hint">{{ examPreviewNote }}</p>
               <div v-for="(row, index) in examDimensionRows" :key="row.name" class="grade__dim">
                 <span class="grade__dim-name">{{ row.name }}</span>
                 <n-input-number v-model:value="row.score" size="small" :min="0" :max="100" style="width: 108px" />
@@ -231,7 +259,7 @@
 
 <script setup lang="ts">
 // 数据:GET /api/admin/submissions(队列);GET /api/admin/submissions/{id}(材料);POST .../{id}/grade(落库)
-import { computed, h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref, type Ref } from 'vue'
 import {
   NAlert,
   NButton,
@@ -253,6 +281,8 @@ import {
   type DataTableColumns,
 } from 'naive-ui'
 import {
+  aiPreviewExamSubmission,
+  aiPreviewSubmission,
   getAdminExamSubmission,
   getAdminExamSubmissions,
   getAdminSubmission,
@@ -267,6 +297,7 @@ import type {
   AdminSubmissionListItem,
   ManualGradeDimension,
   ManualGradeItem,
+  WritingPreview,
 } from '@/types/admin'
 import type { PracticeType } from '@/types/practice'
 
@@ -307,6 +338,11 @@ const dimensionRows = ref<{ name: string; score: number | null; comment: string 
 const sampleAnswer = ref('')
 const overallComment = ref('')
 const scoreOverride = ref<number | null>(null)
+
+/** AI 预评:previewing 期间禁用按钮,note 说明"未提交不生效",snapshot 保存被覆盖前的人工草稿 */
+const previewing = ref(false)
+const previewNote = ref('')
+const previewSnapshot = ref<DraftSnapshot | null>(null)
 
 /** 窄屏判定(后台以桌面为主,抽屉在手机上占满全屏) */
 const isMobile = computed(() => window.innerWidth < 768)
@@ -479,6 +515,8 @@ async function openDetail(row: AdminSubmissionListItem): Promise<void> {
   overallComment.value = ''
   itemRows.value = []
   dimensionRows.value = []
+  previewNote.value = ''
+  previewSnapshot.value = null
   try {
     const data = await getAdminSubmission(row.id)
     detail.value = data
@@ -523,6 +561,154 @@ const dimensionTotal = computed(() =>
       .toFixed(1)
   )
 )
+
+/** 被 AI 覆盖前的人工草稿快照 */
+interface DraftSnapshot {
+  rows: { name: string; score: number | null; comment: string }[]
+  sample: string
+  overall: string
+  score: number | null
+}
+
+/** 一套可被预评写入的表单(练习与模考两个抽屉共用同一行为) */
+interface DraftTarget {
+  rows: Ref<DraftSnapshot['rows']>
+  sample: Ref<string>
+  overall: Ref<string>
+  score: Ref<number | null>
+  note: Ref<string>
+  snapshot: Ref<DraftSnapshot | null>
+}
+
+/**
+ * 把 AI 草稿写进表单:覆盖前先快照当前内容,页面给「撤销 AI 草稿」。
+ * 手写评语被冲掉是判分场景里最招人烦的失误,用可撤销代替弹窗确认,少一次点击又不丢东西。
+ * 服务端预评只读不写库,所以这里怎么折腾都不影响学生看到的状态。
+ */
+function applyPreview(preview: WritingPreview, target: DraftTarget, cap: number): void {
+  target.snapshot.value = {
+    rows: target.rows.value.map((row) => ({ ...row })),
+    sample: target.sample.value,
+    overall: target.overall.value,
+    score: target.score.value,
+  }
+
+  // 按维度名合并而不是整表替换:抽屉里的行是按题面 scoringDimensions 预填的,
+  // AI 少给一维时不能把那一维从界面上抹掉,否则管理员看不到"还有一维没分"就直接提交被拒
+  const incoming = preview.dimensions ?? []
+  const rows = target.rows.value.map((row) => {
+    const hit = incoming.find((item) => item.name === row.name)
+    return hit
+      ? { name: row.name, score: Number(hit.score), comment: hit.comment?.trim() || row.comment }
+      : { ...row }
+  })
+  incoming.forEach((item) => {
+    if (!rows.some((row) => row.name === item.name)) {
+      rows.push({ name: item.name, score: Number(item.score), comment: item.comment ?? '' })
+    }
+  })
+  target.rows.value = rows
+  target.sample.value = preview.sampleAnswer ?? ''
+  target.overall.value = preview.overallComment ?? ''
+  target.score.value = Number(preview.score)
+
+  const sum = rows.reduce((acc, row) => acc + Number(row.score ?? 0), 0)
+  const missing = rows.filter((row) => row.score === null).length
+  let note = `AI 草稿已填入:建议 ${preview.score} / 满分 ${preview.cap}。这只是草稿,点「提交判分」才对学生生效。`
+  if (missing > 0) {
+    note += ` 还有 ${missing} 个维度 AI 没给分,提交前要补齐,否则服务端会拒绝。`
+  } else if (sum > cap) {
+    note += ` 注意:维度合计 ${sum.toFixed(1)} 超过满分,直接提交会被服务端拒绝,请先调低各维度分。`
+  }
+  target.note.value = note
+}
+
+/** 撤销:回到 AI 覆盖前那份人工草稿 */
+function restoreSnapshot(target: DraftTarget): void {
+  const saved = target.snapshot.value
+  if (!saved) return
+  target.rows.value = saved.rows.map((row) => ({ ...row }))
+  target.sample.value = saved.sample
+  target.overall.value = saved.overall
+  target.score.value = saved.score
+  target.snapshot.value = null
+  target.note.value = '已撤销 AI 草稿,回到覆盖前的内容。'
+}
+
+/** 撤销练习抽屉的 AI 草稿(模板里 ref 会自动解包,所以这里包一层专用函数而不是把 ref 传出去) */
+function undoPreview(): void {
+  restoreSnapshot({
+    rows: dimensionRows,
+    sample: sampleAnswer,
+    overall: overallComment,
+    score: scoreOverride,
+    note: previewNote,
+    snapshot: previewSnapshot,
+  })
+}
+
+/** 撤销模考抽屉的 AI 草稿 */
+function undoExamPreview(): void {
+  restoreSnapshot({
+    rows: examDimensionRows,
+    sample: examSampleAnswer,
+    overall: examOverallComment,
+    score: examScoreOverride,
+    note: examPreviewNote,
+    snapshot: examPreviewSnapshot,
+  })
+}
+
+async function onAiPreview(): Promise<void> {
+  const current = detail.value
+  if (!current) return
+  previewing.value = true
+  previewNote.value = 'AI 正在读这份作文(通常 10~40 秒)…'
+  try {
+    applyPreview(
+      await aiPreviewSubmission(current.id),
+      {
+        rows: dimensionRows,
+        sample: sampleAnswer,
+        overall: overallComment,
+        score: scoreOverride,
+        note: previewNote,
+        snapshot: previewSnapshot,
+      },
+      Number(current.totalScore)
+    )
+  } catch {
+    // 失败时表单没被动过(服务端只读),原因已由 request 层弹出
+    previewNote.value = 'AI 预评失败,你已填的内容没有被动过,可以直接重试。'
+  } finally {
+    previewing.value = false
+  }
+}
+
+async function onExamAiPreview(): Promise<void> {
+  const current = examDetail.value
+  if (!current) return
+  examPreviewing.value = true
+  examPreviewNote.value = 'AI 正在读这份作文(通常 10~40 秒)…'
+  try {
+    applyPreview(
+      await aiPreviewExamSubmission(current.id),
+      {
+        rows: examDimensionRows,
+        sample: examSampleAnswer,
+        overall: examOverallComment,
+        score: examScoreOverride,
+        note: examPreviewNote,
+        snapshot: examPreviewSnapshot,
+      },
+      Number(current.writingFullScore)
+    )
+  } catch {
+    examPreviewNote.value = 'AI 预评失败,你已填的内容没有被动过,可以直接重试。'
+  } finally {
+    examPreviewing.value = false
+  }
+}
 
 async function onSubmit(): Promise<void> {
   const current = detail.value
@@ -592,6 +778,11 @@ const examDimensionRows = ref<{ name: string; score: number | null; comment: str
 const examSampleAnswer = ref('')
 const examOverallComment = ref('')
 const examScoreOverride = ref<number | null>(null)
+
+/** 模考抽屉的 AI 预评状态(与练习抽屉同构) */
+const examPreviewing = ref(false)
+const examPreviewNote = ref('')
+const examPreviewSnapshot = ref<DraftSnapshot | null>(null)
 
 const examColumns: DataTableColumns<AdminExamSubmissionListItem> = [
   { title: '提交', key: 'id', width: 76 },
@@ -681,6 +872,8 @@ async function openExamDetail(row: AdminExamSubmissionListItem): Promise<void> {
   examSampleAnswer.value = ''
   examOverallComment.value = ''
   examScoreOverride.value = null
+  examPreviewNote.value = ''
+  examPreviewSnapshot.value = null
   try {
     const data = await getAdminExamSubmission(row.id)
     examDetail.value = data
@@ -866,6 +1059,12 @@ onMounted(fetchList)
 .grade__dim-name {
   width: 88px;
   font-size: 13px;
+}
+
+.grade__preview {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 2px;
 }
 
 .grade__sum {

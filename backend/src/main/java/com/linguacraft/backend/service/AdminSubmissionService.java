@@ -11,6 +11,9 @@ import com.linguacraft.backend.common.ResultCode;
 import com.linguacraft.backend.dto.admin.AdminSubmissionDetailDto;
 import com.linguacraft.backend.dto.admin.AdminSubmissionListItemDto;
 import com.linguacraft.backend.dto.admin.ManualGradeRequest;
+import com.linguacraft.backend.dto.admin.WritingPreviewDto;
+import com.linguacraft.backend.ai.AiGradingService;
+import com.linguacraft.backend.ai.GradedWriting;
 import com.linguacraft.backend.entity.PracticeSubmission;
 import com.linguacraft.backend.entity.Question;
 import com.linguacraft.backend.entity.User;
@@ -73,17 +76,20 @@ public class AdminSubmissionService {
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
     private final WritingGradeSupport writingGradeSupport;
+    private final AiGradingService aiGradingService;
 
     public AdminSubmissionService(PracticeSubmissionMapper submissionMapper,
                                   QuestionMapper questionMapper,
                                   UserMapper userMapper,
                                   ObjectMapper objectMapper,
-                                  WritingGradeSupport writingGradeSupport) {
+                                  WritingGradeSupport writingGradeSupport,
+                                  AiGradingService aiGradingService) {
         this.submissionMapper = submissionMapper;
         this.questionMapper = questionMapper;
         this.userMapper = userMapper;
         this.objectMapper = objectMapper;
         this.writingGradeSupport = writingGradeSupport;
+        this.aiGradingService = aiGradingService;
     }
 
     // ==================== 查询 ====================
@@ -259,6 +265,56 @@ public class AdminSubmissionService {
         log.info("管理端人工批改: submissionId={} type={} score={} correct={}/{}",
                 id, submission.getType(), score, correctCount, totalCount);
         return detail(id);
+    }
+
+    // ==================== AI 预评 ====================
+
+    /**
+     * AI 预评练习写作件(POST /api/admin/submissions/{id}/ai-preview)。
+     *
+     * <p><b>只读不写。</b>拿题目下发内容与学生会话正文交给 AI 起草,把四维分/范文/总评回填到判分抽屉;
+     * 数据库一个字节都不动,学生看到的仍是「待批改」,管理员改完走 {@link #grade} 才生效。
+     * 这样才不违背「学生选了人工批改就由真人定分」的承诺。</p>
+     *
+     * @param id 提交 ID
+     * @return 预评草稿
+     */
+    public WritingPreviewDto aiPreview(Long id) {
+        PracticeSubmission submission = findSubmission(id);
+        if (!"writing".equals(submission.getType())) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(),
+                    "只有写作题需要 AI 预评;客观题按答案键自动比对,不进人工队列");
+        }
+        if (!STATUS_PENDING.equals(submission.getStatus())) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(),
+                    "该提交当前状态为 " + submission.getStatus() + ",AI 预评只对待批改(pending)的件有效");
+        }
+        String text = writingText(submission);
+        if (text == null || text.isBlank()) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(), "该提交没有作文正文,无法 AI 预评");
+        }
+        Question question = questionMapper.selectById(submission.getQuestionId());
+        if (question == null || !"writing".equals(question.getType())) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(), "该提交对应的写作题不存在,无法 AI 预评");
+        }
+
+        GradedWriting graded = aiGradingService.gradeWriting(question, text);
+        // 满分以提交时快照的卷面总分为准(题目后来被改分也不影响这份件的口径)
+        BigDecimal cap = submission.getTotalScore() != null ? submission.getTotalScore() : question.getTotalScore();
+        WritingPreviewDto preview = writingGradeSupport.toPreview(graded, cap);
+        log.info("管理端 AI 预评(练习): submissionId={} 建议 {} / 满分 {}", id, preview.getScore(), cap);
+        return preview;
+    }
+
+    /**
+     * 学生作文正文(写作题的 {@code answers} 形如 {@code {content:"..."}})。
+     *
+     * @param submission 提交
+     * @return 正文(可为空串)
+     */
+    private String writingText(PracticeSubmission submission) {
+        JsonNode node = readTree(submission.getAnswers());
+        return node == null ? null : node.path("content").asText("");
     }
 
     // ==================== 判分计算 ====================

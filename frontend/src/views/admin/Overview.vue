@@ -132,7 +132,7 @@
       </n-card>
     </n-spin>
 
-    <n-card size="small" title="后台交付记录(A1–A6 已全部落地)" style="margin-top: 16px">
+    <n-card size="small" title="后台交付记录(A1–A7 已全部落地)" style="margin-top: 16px">
       <n-list hoverable>
         <n-list-item v-for="item in roadmap" :key="item.phase">
           <template #prefix><n-tag size="small" :bordered="false">{{ item.phase }}</n-tag></template>
@@ -141,7 +141,7 @@
         </n-list-item>
       </n-list>
       <p class="admin-muted roadmap-note">
-        未纳入本轮:AI 预评按钮与 AI 出题复核队列、趋势图表、账号删除与密码重置、整卷复制与 AI 出整卷。
+        未纳入:AI 出题复核队列与批量预评、题目录入表单权威化、后台一键 AI 生成草稿、AI 校核单题(补可接受变体与解析)、趋势图表、账号删除与密码重置、整卷复制与整卷结构化编辑。
       </p>
     </n-card>
   </div>
@@ -195,6 +195,7 @@ const roadmap = [
   { phase: 'A4', title: '人工批改工作台(练习 A4 + 模考作文 A4-②)', status: '已交付' },
   { phase: 'A5', title: '运营看板与用户管理(停用、角色调整)', status: '已交付' },
   { phase: 'A6', title: '内容全家桶(词书 / 单词含批量导入 / 语法 / 真题卷管理)', status: '已交付' },
+  { phase: 'A7', title: 'AI 预评(写作件起草,只读不落库,可撤销)', status: '已交付' },
 ]
 
 async function load(): Promise<void> {

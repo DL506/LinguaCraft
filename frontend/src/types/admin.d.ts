@@ -89,6 +89,20 @@ export interface AdminSubmissionListItem {
 }
 
 /** 管理端批改详情(GET /api/admin/submissions/{id}) */
+/**
+ * AI 预评草稿(阶段 A7):练习与模考两条预评接口共用同一形状。
+ * 服务端**不落库**,这些值只填进判分抽屉,管理员点「提交判分」后才对学生生效。
+ */
+export interface WritingPreview {
+  /** AI 建议总分(已按 cap 截断;取维度实算,不采信 AI 自报合计) */
+  score: number
+  /** 作文满分(题面口径) */
+  cap: number
+  dimensions: ManualGradeDimension[]
+  sampleAnswer?: string
+  overallComment?: string
+}
+
 export interface AdminSubmissionDetail {
   id: number
   userId: number

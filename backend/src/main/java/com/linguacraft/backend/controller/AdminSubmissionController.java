@@ -5,6 +5,7 @@ import com.linguacraft.backend.common.R;
 import com.linguacraft.backend.dto.admin.AdminSubmissionDetailDto;
 import com.linguacraft.backend.dto.admin.AdminSubmissionListItemDto;
 import com.linguacraft.backend.dto.admin.ManualGradeRequest;
+import com.linguacraft.backend.dto.admin.WritingPreviewDto;
 import com.linguacraft.backend.service.AdminSubmissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -89,5 +90,22 @@ public class AdminSubmissionController {
             @Parameter(description = "提交 ID", required = true) @PathVariable("id") Long id,
             @Valid @RequestBody ManualGradeRequest request) {
         return R.ok(adminSubmissionService.grade(id, request));
+    }
+
+    /**
+     * AI 预评写作件(草稿,不落库)。
+     *
+     * @param id 提交 ID
+     * @return 统一响应:data 为 AI 建议的分项得分与评语
+     */
+    @Operation(summary = "AI 预评(练习写作件)",
+            description = "把学生作文交给 AI 起草四维分/范文/总评,前端回填到判分抽屉供人工审阅。"
+                    + "**只读不写**:不改 status、不写 writing_result,学生仍显示待批改;管理员改完必须调 /grade 才生效。"
+                    + "满分按题面口径(提交快照的卷面总分),不采信 AI 自报满分")
+    @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功,code=400 非写作题/非待批改/无正文,code=404 提交不存在,code=500 AI 调用失败(抽屉内容不受影响,可重试)")
+    @PostMapping("/{id}/ai-preview")
+    public R<WritingPreviewDto> aiPreview(
+            @Parameter(description = "提交 ID", required = true) @PathVariable("id") Long id) {
+        return R.ok(adminSubmissionService.aiPreview(id));
     }
 }

@@ -86,6 +86,7 @@ cd backend
 - 内容管理(阶段 A6):`/api/admin/vocab`(词书+单词+CSV 导入)、`/api/admin/grammar`(节点+章节)、`/api/admin/exam-papers`(真题卷+上下架)。
   **词书是过滤器不是归属**:`vocab_book.filter_level` 按等级筛词,没有中间表,所以"改词书"=改单词 `level`;`vocab_book.total` 不自动派生,只有 `PATCH /books/{id}/sync-total` 显式对齐(自动派生会让首页数字暴跌)。
   单词/词书/试卷的删除一律**引用保护**(命中学习记录、收藏、交卷即拒),新单词 ID 沿用 `w-` + 位宽补零,学生端列表按 `LENGTH(id), id` 排序;CSV 解析用自写 `CsvWordParser`(RFC 4180 状态机,不新增依赖),**行级失败跳过、整单级失败(空文件/表头缺列)400 拒绝**。背景见 `docs/verification/A6-内容与真题卷管理.md`。
+- AI 预评(阶段 A7):`POST /api/admin/submissions/{id}/ai-preview` 与 `/api/admin/exam-submissions/{id}/ai-preview` 让 AI 起草写作件的四维分/范文/总评,前端回填到判分抽屉。**只读不写库**(尤其不碰 `writing_graded_at`,一写学生端就认为作文出分),满分取题面口径,建议分取**维度实算**而非 AI 自报合计;映射集中在 `WritingGradeSupport.toPreview`。前端覆盖前快照、给「撤销 AI 草稿」,并按维度名合并而不是整表替换。注意 `ExamService.report` 对 `partially_graded + ai` 有防重入兜底会补触发 AI 评分,演示用样本要做成 `manual` 才不会被读一次就消失。背景见 `docs/verification/A7-AI预评.md`。
 - 真题卷上下架(阶段 A6-③):`exam_paper.status` 由 `db/V09` 加列,默认 1。学生侧**列表/详情/作答/进度**四处按 `status=1` 过滤并拒下架卷,**但 `buildReport` 不看状态** —— 下架是停止投放,不是抹掉历史成绩。写入前必过 `ExamPaperValidator` 四条硬校验(编号集合相等、编号全卷唯一、`sum(section.score)==total_score`、恰好一个 15 分写作部分),因为编号错配的后果是**客观题静默判错**而不是报错。
 - **JSON 栈统一为 Jackson 3**(`tools.jackson.*`,Spring Boot 4 默认):实体主键 `Long` 由 `config/JacksonConfig` 的 `JacksonModule` Bean 全局序列化为字符串(对应前端 `id: string`)。不得再使用 `com.fasterxml.jackson.databind/core` 的类(`com.fasterxml.jackson.annotation` 注解包除外);swagger 注解包版本已在 `pom.xml` 固定为 2.2.52,勿降级。背景见 `docs/verification/S9-Jackson3启动缺陷修复.md`。
 

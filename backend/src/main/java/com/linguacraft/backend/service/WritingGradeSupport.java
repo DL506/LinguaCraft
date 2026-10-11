@@ -1,8 +1,10 @@
 package com.linguacraft.backend.service;
 
+import com.linguacraft.backend.ai.GradedWriting;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.common.ResultCode;
 import com.linguacraft.backend.dto.admin.GradeDimension;
+import com.linguacraft.backend.dto.admin.WritingPreviewDto;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
@@ -80,5 +82,35 @@ public class WritingGradeSupport {
                 .map(GradeDimension::getScore)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(1, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 把 AI 作文评分结果转成预评草稿(练习与模考两条预评路径共用同一个映射,形状保持一致)。
+     *
+     * <p>建议总分取<b>维度之和</b>而不是 AI 自报的 {@code graded.score()} —— 抽屉里管理员看到的是一格
+     * 一格的维度分,若顶部总分与它们加不起来,就会被当成 bug。AI 自报的合计只在
+     * {@code AiGradingService} 内部做封顶用,到这里以维度实算为准。</p>
+     *
+     * @param graded AI 评分结果
+     * @param cap    该项满分(题面口径,不采信 AI 返回值)
+     * @return 预评草稿
+     */
+    public WritingPreviewDto toPreview(GradedWriting graded, BigDecimal cap) {
+        List<GradeDimension> dimensions = graded.dimensions().stream()
+                .map(item -> GradeDimension.builder()
+                        .name(item.getName())
+                        .score(item.getScore() == null ? BigDecimal.ZERO
+                                : item.getScore().setScale(1, RoundingMode.HALF_UP))
+                        .comment(item.getComment())
+                        .build())
+                .toList();
+        BigDecimal sum = dimensionSum(dimensions);
+        return WritingPreviewDto.builder()
+                .score(cap != null && sum.compareTo(cap) > 0 ? cap : sum)
+                .cap(cap)
+                .dimensions(dimensions)
+                .sampleAnswer(graded.sampleAnswer())
+                .overallComment(graded.overallComment())
+                .build();
     }
 }

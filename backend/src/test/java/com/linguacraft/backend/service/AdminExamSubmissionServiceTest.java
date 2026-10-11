@@ -1,10 +1,14 @@
 package com.linguacraft.backend.service;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.linguacraft.backend.ai.AiGradingService;
+import com.linguacraft.backend.ai.GradedWriting;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.dto.admin.AdminExamSubmissionDetailDto;
 import com.linguacraft.backend.dto.admin.ExamWritingGradeRequest;
 import com.linguacraft.backend.dto.admin.GradeDimension;
+import com.linguacraft.backend.dto.admin.WritingPreviewDto;
+import com.linguacraft.backend.dto.practice.WritingDimensionDto;
 import com.linguacraft.backend.entity.ExamPaper;
 import com.linguacraft.backend.entity.ExamSubmission;
 import com.linguacraft.backend.mapper.ExamPaperMapper;
@@ -50,10 +54,13 @@ class AdminExamSubmissionServiceTest {
     @Mock
     private UserMapper userMapper;
 
+    @Mock
+    private AiGradingService aiGradingService;
+
     private AdminExamSubmissionService newService() {
         ObjectMapper mapper = new ObjectMapper();
         return new AdminExamSubmissionService(submissionMapper, paperMapper, userMapper, mapper,
-                new WritingGradeSupport(mapper));
+                new WritingGradeSupport(mapper), aiGradingService);
     }
 
     /** 一份待判作文的模考提交:客观 48 分已算好,写作未出分 */
@@ -239,5 +246,71 @@ class AdminExamSubmissionServiceTest {
         assertThatThrownBy(() -> newService().detail(99L))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("模考提交不存在");
+    }
+
+    // ==================== AI 预评(阶段 A7) ====================
+
+    @Test
+    @DisplayName("作文已出分的件不再预评")
+    void previewRejectsGradedWriting() {
+        ExamSubmission graded = awaitingWriting();
+        graded.setWritingGradedAt(LocalDateTime.now());
+        graded.setWritingScore(new BigDecimal("9.0"));
+        when(submissionMapper.selectById(1L)).thenReturn(graded);
+
+        assertThatThrownBy(() -> newService().aiPreview(1L))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("该提交的作文已出分(9.0 分),无需 AI 预评");
+        verify(aiGradingService, never()).gradeWriting(any(), any());
+    }
+
+    @Test
+    @DisplayName("没有作文正文的件不预评")
+    void previewRejectsEmptyWriting() {
+        ExamSubmission blank = awaitingWriting();
+        blank.setWriting("{\"content\":\"  \"}");
+        when(submissionMapper.selectById(1L)).thenReturn(blank);
+
+        assertThatThrownBy(() -> newService().aiPreview(1L))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("该提交没有作文作答,无法 AI 预评");
+    }
+
+    @Test
+    @DisplayName("试卷没有写作部分时明确拒绝,而不是拿空题干去问 AI")
+    void previewRejectsPaperWithoutWriting() {
+        ExamPaper noWriting = paper();
+        noWriting.setContent("{\"sections\":[{\"part\":1,\"type\":\"reading\",\"score\":30,\"content\":{}}]}");
+        when(submissionMapper.selectById(1L)).thenReturn(awaitingWriting());
+        when(paperMapper.selectById("exam-2026")).thenReturn(noWriting);
+
+        assertThatThrownBy(() -> newService().aiPreview(1L))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("该试卷没有写作部分,无法 AI 预评");
+    }
+
+    @Test
+    @DisplayName("预评按试卷写作满分截断维度合计,且一个字节都不写库")
+    void previewCapsAtWritingScoreAndNeverWrites() {
+        when(submissionMapper.selectById(1L)).thenReturn(awaitingWriting());
+        when(paperMapper.selectById("exam-2026")).thenReturn(paper());
+        when(aiGradingService.gradeWriting(any(), any())).thenReturn(new GradedWriting(
+                List.of(writingDimension("内容要点", "8.0"), writingDimension("语言表达", "8.0")),
+                "AI 范文", "AI 总评", new BigDecimal("16.0")));
+
+        WritingPreviewDto preview = newService().aiPreview(1L);
+
+        assertThat(preview.getCap()).isEqualByComparingTo("15");
+        // AI 自报 16 分,但只给 15 分的卷子必须被截到 15
+        assertThat(preview.getScore()).isEqualByComparingTo("15.0");
+        assertThat(preview.getDimensions()).hasSize(2);
+        assertThat(preview.getSampleAnswer()).isEqualTo("AI 范文");
+        assertThat(preview.getOverallComment()).isEqualTo("AI 总评");
+        verify(submissionMapper, never()).update(isNull(), any());
+        verify(submissionMapper, never()).insert(any(ExamSubmission.class));
+    }
+
+    private WritingDimensionDto writingDimension(String name, String score) {
+        return WritingDimensionDto.builder().name(name).score(new BigDecimal(score)).comment("评语").build();
     }
 }

@@ -1,10 +1,14 @@
 package com.linguacraft.backend.service;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.linguacraft.backend.ai.AiGradingService;
+import com.linguacraft.backend.ai.GradedWriting;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.dto.admin.AdminSubmissionDetailDto;
 import com.linguacraft.backend.dto.admin.GradeDimension;
 import com.linguacraft.backend.dto.admin.ManualGradeRequest;
+import com.linguacraft.backend.dto.admin.WritingPreviewDto;
+import com.linguacraft.backend.dto.practice.WritingDimensionDto;
 import com.linguacraft.backend.entity.PracticeSubmission;
 import com.linguacraft.backend.entity.Question;
 import com.linguacraft.backend.mapper.PracticeSubmissionMapper;
@@ -50,10 +54,13 @@ class AdminSubmissionServiceTest {
     @Mock
     private UserMapper userMapper;
 
+    @Mock
+    private AiGradingService aiGradingService;
+
     private AdminSubmissionService newService() {
         ObjectMapper mapper = new ObjectMapper();
         return new AdminSubmissionService(submissionMapper, questionMapper, userMapper, mapper,
-                new WritingGradeSupport(mapper));
+                new WritingGradeSupport(mapper), aiGradingService);
     }
 
     /** 一条待批改的客观题提交(学生作答了题号 1 与 2) */
@@ -185,5 +192,86 @@ class AdminSubmissionServiceTest {
         assertThatThrownBy(() -> newService().grade(17L, ManualGradeRequest.builder().overallComment("总评").build()))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("作文题必须提交至少一个评分维度");
+    }
+
+    // ==================== AI 预评(阶段 A7) ====================
+
+    /** 一条待批改的写作提交(有正文,满分 15) */
+    private PracticeSubmission pendingWriting() {
+        PracticeSubmission submission = pendingObjective();
+        submission.setType("writing");
+        submission.setQuestionId("writing-teacher-1");
+        submission.setAnswers("{\"content\":\"Dear Mr. Smith, I am writing to apply for the volunteer job.\"}");
+        submission.setTotalScore(new BigDecimal("15.0"));
+        return submission;
+    }
+
+    private Question writingQuestion() {
+        Question question = new Question();
+        question.setId("writing-teacher-1");
+        question.setType("writing");
+        question.setContent("{\"prompt\":\"申请英语角志愿者\",\"scoringDimensions\":[\"内容要点\",\"语言表达\"]}");
+        question.setAnswerKey("{\"sampleAnswer\":\"范文\"}");
+        question.setHasAnswer(false);
+        question.setTotalScore(new BigDecimal("15.0"));
+        return question;
+    }
+
+    @Test
+    @DisplayName("客观题不该被送来 AI 预评(它们由答案键比对出分)")
+    void previewRejectsObjectiveType() {
+        when(submissionMapper.selectById(17L)).thenReturn(pendingObjective());
+
+        assertThatThrownBy(() -> newService().aiPreview(17L))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("只有写作题需要 AI 预评");
+        verify(aiGradingService, never()).gradeWriting(any(), any());
+    }
+
+    @Test
+    @DisplayName("已批改的写作件不预评")
+    void previewRejectsGradedSubmission() {
+        PracticeSubmission graded = pendingWriting();
+        graded.setStatus("graded");
+        when(submissionMapper.selectById(17L)).thenReturn(graded);
+
+        assertThatThrownBy(() -> newService().aiPreview(17L))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("AI 预评只对待批改(pending)的件有效");
+    }
+
+    @Test
+    @DisplayName("写作题本体缺失时拒绝,而不是拿空题干去问 AI")
+    void previewRejectsMissingQuestion() {
+        when(submissionMapper.selectById(17L)).thenReturn(pendingWriting());
+        when(questionMapper.selectById("writing-teacher-1")).thenReturn(null);
+
+        assertThatThrownBy(() -> newService().aiPreview(17L))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("写作题不存在");
+        verify(aiGradingService, never()).gradeWriting(any(), any());
+    }
+
+    @Test
+    @DisplayName("预评返回草稿、总分按维度实算并截到题面满分,且不写库")
+    void previewReturnsDraftWithoutWriting() {
+        when(submissionMapper.selectById(17L)).thenReturn(pendingWriting());
+        when(questionMapper.selectById("writing-teacher-1")).thenReturn(writingQuestion());
+        when(aiGradingService.gradeWriting(any(Question.class), any(String.class))).thenReturn(new GradedWriting(
+                List.of(WritingDimensionDto.builder().name("内容要点").score(new BigDecimal("8.0")).comment("还行").build(),
+                        WritingDimensionDto.builder().name("语言表达").score(new BigDecimal("8.0")).comment("还行").build()),
+                "AI 范文", "AI 总评", new BigDecimal("16.0")));
+
+        WritingPreviewDto preview = newService().aiPreview(17L);
+
+        assertThat(preview.getCap()).isEqualByComparingTo("15.0");
+        // 总分取维度实算(16.0)再截到满分,而不是 AI 自报的那个数
+        assertThat(preview.getScore()).isEqualByComparingTo("15.0");
+        assertThat(preview.getDimensions()).hasSize(2);
+        assertThat(preview.getDimensions().get(0).getName()).isEqualTo("内容要点");
+        assertThat(preview.getSampleAnswer()).isEqualTo("AI 范文");
+        // 预评不许碰库:写了 writing_result 或 status 学生就会看到"已批改"
+        verify(submissionMapper, never()).update(isNull(), any());
+        verify(submissionMapper, never()).updateById(any(PracticeSubmission.class));
     }
 }

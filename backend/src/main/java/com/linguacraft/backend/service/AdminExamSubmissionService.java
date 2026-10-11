@@ -4,14 +4,18 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import com.linguacraft.backend.ai.AiGradingService;
+import com.linguacraft.backend.ai.GradedWriting;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.common.PageResult;
 import com.linguacraft.backend.common.ResultCode;
 import com.linguacraft.backend.dto.admin.AdminExamSubmissionDetailDto;
 import com.linguacraft.backend.dto.admin.AdminExamSubmissionListItemDto;
 import com.linguacraft.backend.dto.admin.ExamWritingGradeRequest;
+import com.linguacraft.backend.dto.admin.WritingPreviewDto;
 import com.linguacraft.backend.entity.ExamPaper;
 import com.linguacraft.backend.entity.ExamSubmission;
+import com.linguacraft.backend.entity.Question;
 import com.linguacraft.backend.entity.User;
 import com.linguacraft.backend.mapper.ExamPaperMapper;
 import com.linguacraft.backend.mapper.ExamSubmissionMapper;
@@ -70,17 +74,20 @@ public class AdminExamSubmissionService {
     private final UserMapper userMapper;
     private final ObjectMapper objectMapper;
     private final WritingGradeSupport writingGradeSupport;
+    private final AiGradingService aiGradingService;
 
     public AdminExamSubmissionService(ExamSubmissionMapper submissionMapper,
                                       ExamPaperMapper paperMapper,
                                       UserMapper userMapper,
                                       ObjectMapper objectMapper,
-                                      WritingGradeSupport writingGradeSupport) {
+                                      WritingGradeSupport writingGradeSupport,
+                                      AiGradingService aiGradingService) {
         this.submissionMapper = submissionMapper;
         this.paperMapper = paperMapper;
         this.userMapper = userMapper;
         this.objectMapper = objectMapper;
         this.writingGradeSupport = writingGradeSupport;
+        this.aiGradingService = aiGradingService;
     }
 
     // ==================== 查询 ====================
@@ -238,6 +245,50 @@ public class AdminExamSubmissionService {
         }
         log.info("管理端模考作文人工批改: submissionId={} writingScore={}/{}", id, score, cap);
         return detail(id);
+    }
+
+    // ==================== AI 预评 ====================
+
+    /**
+     * AI 预评模考作文(POST /api/admin/exam-submissions/{id}/ai-preview)。
+     *
+     * <p>给"AI 异步评分失败后停在 {@code partially_graded}"的那批件用:此前它们只能从零手写,
+     * 现在先让 AI 起草一版,管理员改完走 {@link #gradeWriting} 落库。<b>本方法不写任何列</b>,
+     * 尤其不碰 {@code writing_graded_at} —— 那个字段一写,学生端就认为作文出分了。</p>
+     *
+     * @param id 模考提交 ID
+     * @return 预评草稿
+     */
+    public WritingPreviewDto aiPreview(Long id) {
+        ExamSubmission submission = findSubmission(id);
+        if (submission.getWritingGradedAt() != null) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(),
+                    "该提交的作文已出分(" + submission.getWritingScore() + " 分),无需 AI 预评");
+        }
+        if (STATUS_GRADED.equals(submission.getStatus())) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(), "该提交已是已批改状态,无需 AI 预评");
+        }
+        String text = writingContent(submission);
+        if (text == null || text.isBlank()) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(), "该提交没有作文作答,无法 AI 预评");
+        }
+        ExamPaper paper = paperMapper.selectById(submission.getExamId());
+        JsonNode section = writingSection(paper);
+        if (section == null) {
+            throw new BizException(ResultCode.PARAM_ERROR.getCode(), "该试卷没有写作部分,无法 AI 预评");
+        }
+
+        // 用承载对象喂 AI:题干取试卷写作部分,满分取该部分分值(与人工判分同一口径)
+        Question carrier = new Question();
+        carrier.setType("writing");
+        carrier.setTotalScore(writingFullScore(paper));
+        carrier.setContent(section.toString());
+
+        GradedWriting graded = aiGradingService.gradeWriting(carrier, text);
+        WritingPreviewDto preview = writingGradeSupport.toPreview(graded, writingFullScore(paper));
+        log.info("管理端 AI 预评(模考): submissionId={} 建议 {} / 作文满分 {}",
+                id, preview.getScore(), preview.getCap());
+        return preview;
     }
 
     // ==================== 小工具 ====================

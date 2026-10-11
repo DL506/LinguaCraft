@@ -5,6 +5,7 @@ import com.linguacraft.backend.common.R;
 import com.linguacraft.backend.dto.admin.AdminExamSubmissionDetailDto;
 import com.linguacraft.backend.dto.admin.AdminExamSubmissionListItemDto;
 import com.linguacraft.backend.dto.admin.ExamWritingGradeRequest;
+import com.linguacraft.backend.dto.admin.WritingPreviewDto;
 import com.linguacraft.backend.service.AdminExamSubmissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -86,5 +87,22 @@ public class AdminExamSubmissionController {
             @Parameter(description = "提交 ID", required = true) @PathVariable("id") Long id,
             @Valid @RequestBody ExamWritingGradeRequest request) {
         return R.ok(adminExamSubmissionService.gradeWriting(id, request));
+    }
+
+    /**
+     * AI 预评模考作文(草稿,不落库)。
+     *
+     * @param id 提交 ID
+     * @return 统一响应:data 为 AI 建议的分项得分与评语
+     */
+    @Operation(summary = "AI 预评(模考作文)",
+            description = "给 AI 异步评分失败后停在 partially_graded 的件起草。"
+                    + "**只读不写**:尤其不写 writing_graded_at(一写学生端就认为作文出分了),管理员改完必须调 /grade-writing 才生效。"
+                    + "满分取试卷写作部分 score,与人工判分同一口径")
+    @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功,code=400 已出分/无正文/试卷无写作部分,code=404 提交不存在,code=500 AI 调用失败(可重试)")
+    @PostMapping("/{id}/ai-preview")
+    public R<WritingPreviewDto> aiPreview(
+            @Parameter(description = "提交 ID", required = true) @PathVariable("id") Long id) {
+        return R.ok(adminExamSubmissionService.aiPreview(id));
     }
 }
