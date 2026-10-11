@@ -469,7 +469,7 @@ export const examStore: ExamPaperFull[] = [
             '假定你是李华,学校英文报正在征集关于“人工智能与学习”的短文。请写一篇文章投稿,内容包括:(1)你在学习中如何使用 AI 工具;(2)你对 AI 学习的看法。',
           requirements: ['词数 100-120;', '观点明确,内容积极;', '结构完整。'],
           wordLimit: 120,
-          scoringDimensions: ['内容要点', '语言表达', '篇章结构'],
+          scoringDimensions: ['内容要点', '语言表达', '篇章结构', '格式规范'],
           sampleAnswer:
             'Artificial intelligence has become part of my daily study. I often use translation tools to check my writing and ask AI assistants to explain difficult grammar points. These tools save me a lot of time and let me learn at my own pace.\n\nIn my opinion, AI is a helpful servant, not a master. It can answer questions quickly, but real understanding still comes from thinking by ourselves. So I never copy AI answers directly; I use them as a starting point for my own ideas.\n\nIf we use AI wisely, learning will become more efficient and more interesting.',
         },

@@ -21,7 +21,7 @@ export const writingStore: StoredPracticeItem<'writing'>[] = [
         '可适当增加细节,使行文连贯。',
       ],
       wordLimit: 120,
-      scoringDimensions: ['内容要点', '语言表达', '篇章结构'],
+      scoringDimensions: ['内容要点', '语言表达', '篇章结构', '格式规范'],
       sampleAnswer:
         'Dear Peter,\n\nI am glad to hear that you are coming to study in China. Here are three tips to help you settle in quickly.\n\nFirst, try to speak Chinese in daily life. Even simple greetings will help you make friends and improve your language skills. Second, join a student club, such as a basketball team or a calligraphy group, where you can meet people who share your interests. Third, give yourself time to get used to the food. Many canteens offer both Chinese and Western dishes, so you will always find something you like.\n\nI hope these suggestions are helpful. Looking forward to seeing you soon!\n\nYours sincerely,\nLi Hua',
     },
@@ -43,7 +43,7 @@ export const writingStore: StoredPracticeItem<'writing'>[] = [
         '至少给出两条支撑理由。',
       ],
       wordLimit: 120,
-      scoringDimensions: ['内容要点', '语言表达', '篇章结构'],
+      scoringDimensions: ['内容要点', '语言表达', '篇章结构', '格式规范'],
       sampleAnswer:
         'More and more college students are taking professional certificates before graduation. In my opinion, the advantages outweigh the disadvantages.\n\nFirst, certificates show employers that a student has practical skills beyond textbooks, which helps in job hunting. Second, preparing for a certificate exam forces students to manage their time well and keep learning. As long as students do not let certificates replace their major courses, the process is rewarding.\n\nOf course, students should choose certificates related to their career plans instead of collecting random ones. With a clear goal and balanced effort, certificates can open more doors after graduation.',
     },

@@ -80,6 +80,10 @@ cd backend
 - 模考作文判分(阶段 A4-②):`/api/admin/exam-submissions` 队列/材料/`POST /{id}/grade-writing`。只写写作列(`writing_score`/`writing_result`/`writing_graded_at`/`status='graded'`/`grading_method='manual'`,清空 `estimated_time`),客观分不动;
   CAS 用 `writing_graded_at IS NULL AND status<>'graded'`,与 `ExamAsyncGrader` 互斥。**写作满分取自试卷 writing section 的 score**,不是硬编码。
   两条人工批改路径的 `writing_result` 一律由 `service/WritingGradeSupport` 产出;成绩报告 `ExamReportDto` 现含 `writingDimensions`/`writingSampleAnswer`/`writingOverallComment`(此前只落库不下发)。
+- **写作评分维度全项目统一为 4 项**:内容要点 / 语言表达 / 篇章结构 / 格式规范(2026-10-12 用户拍板,应用文的"格式"独立计分)。
+  口径同时落在三处,改任何一处都要同步另两处,否则新装环境与本机分叉:`ai/PromptTemplates.java` 的写作出题提示词(要求恰好 4 项)、
+  `db/S02`/`db/S03` 种子题面、`db/V10__normalize_writing_dimensions.sql`(老库补齐,幂等,只主题面**不动历史 `writing_result`**)。
+  维度个数不参与分值计算(判分只校验各维度之和 ≤ 卷面总分,单维输入上限 `dimensionCap=100`),所以加减维度不影响任何已有分数。背景见 `docs/verification/A8前-写作评分维度统一.md`。
 - 看板与用户管理(阶段 A5):`GET /api/admin/dashboard` 出全站计数,`/api/admin/users` 出列表/详情与 `PATCH .../status`、`PATCH .../role`。
   看板「今日」一律 `created_at >= 今日零点`(同 `HomeService` 与 `UserService.stats`,不用 `submitted_at`);`practicePending` 与学生端 `stats.pendingGradingCount` 同口径仅练习,模考欠账分列 `examPending` 与 `examWritingUngraded`;
   DTO 计数用**基本类型**,避开全局 `Long`→字符串规则。三条护栏:不许停用自己、不许给自己降权、必须保留至少一个管理员;停用/降权**不影响已签发令牌**(过滤器只读声明,最长 2 小时)。背景见 `docs/verification/A5-运营看板与用户管理.md`。

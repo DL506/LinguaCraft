@@ -49,5 +49,8 @@ Get-Content .\backend\src\main\resources\db\V02__create_user_auth_tables.sql -Ra
 | V08 | V08__add_user_role_and_enabled.sql | user 表加 `role`(student/admin)与 `enabled` 两列 + `idx_user_role`(information_schema 判重 + PREPARE 实现幂等) | V02 | 是 | 已执行 |
 | V09 | V09__add_exam_paper_status.sql | exam_paper 加 `status`(1 上架/0 下架)+ `idx_exam_status`;默认 1,既有卷自动保持上架 | V05 | 是 | 已执行 |
 | S07 | S07__seed_admin_account.sql | 后台管理员账号 admin/123456(role=admin)及其默认设置 | V02/V08 | 是 | 已执行 |
+| V10 | V10__normalize_writing_dimensions.sql | 写作评分维度统一为 4 项(补"格式规范"):题库全部写作题题面 + 真题卷写作部分题面。**只改题面 content.scoringDimensions,不改任何历史判分快照 `writing_result`**;维度个数不参与分值计算,故不动任何已有分数 | V03/V05 | 是 | 已执行(2026-10-12,重跑哈希不变) |
+
+> **S02 / S03 种子已同步为 4 维**(全新库直接执行种子即得到 4 项,无需再跑 V10;老库跑 V10 补齐)。两边口径必须一致,否则新装环境与本机的维度数会分叉。
 
 > 后续步骤新增的 V/S 脚本将在此表按序追加。
