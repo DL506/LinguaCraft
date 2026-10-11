@@ -1,0 +1,1 @@
+import{N as e,R as t,m as n}from"./light-TBGKFU-e.js";import{a as r}from"./light-XL89zeHF.js";var i={iconSize:`22px`};function a(e){let{fontSize:t,warningColor:n}=e;return{...i,fontSize:t,iconColor:n}}var o=e({name:`Popconfirm`,common:t,peers:{Button:n,Popover:r},self:a});export{a as n,o as t};

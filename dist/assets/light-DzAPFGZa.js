@@ -1,0 +1,1 @@
+import{R as e}from"./light-TBGKFU-e.js";function t(e){let{textColorBase:t,opacity1:n,opacity2:r,opacity3:i,opacity4:a,opacity5:o}=e;return{color:t,opacity1Depth:n,opacity2Depth:r,opacity3Depth:i,opacity4Depth:a,opacity5Depth:o}}var n={name:`Icon`,common:e,self:t};export{t as n,n as t};

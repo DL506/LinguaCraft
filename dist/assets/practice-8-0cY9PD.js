@@ -1,0 +1,1 @@
+import{Un as e}from"./light-TBGKFU-e.js";import{n as t}from"./pinia-Bt1DtLru.js";var n=t(`practice`,()=>{let t=e(null);function n(e){t.value=e}function r(){let e=t.value;return t.value=null,e}return{incomingItem:t,setIncomingItem:n,takeIncomingItem:r}});export{n as t};

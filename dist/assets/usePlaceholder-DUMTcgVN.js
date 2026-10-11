@@ -1,0 +1,1 @@
+function e(){function e(e){return e.split(/(\[\[\d+\]\])/).map(e=>{let t=e.match(/^\[\[(\d+)\]\]$/);return t?{type:`blank`,content:e,id:Number(t[1])}:{type:`text`,content:e}}).filter(e=>e.content!==``)}return{parsePassage:e}}export{e as t};

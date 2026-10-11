@@ -1,0 +1,1 @@
+import{Cn as e,Ut as t,xn as n}from"./light-TBGKFU-e.js";import{Y as r}from"./request-BS4zoC18.js";var i=r?document?.fonts?.ready:void 0,a=!1;i===void 0?a=!0:i.then(()=>{a=!0});function o(t){if(a)return;let r=!1;e(()=>{a||i?.then(()=>{r||t()})}),n(()=>{r=!0})}var{c:s}=t(),c=`vueuc-style`;export{c as n,o as r,s as t};
