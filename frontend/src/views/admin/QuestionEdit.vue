@@ -1,5 +1,7 @@
-<!-- 后台题目录入/编辑(阶段 A2):分题型结构化表单 + 原始 JSON 面板
-     同步规则:表单改动实时生成下方 JSON;若手工编辑 JSON,则以 JSON 为准提交(表单可能不同步,界面会提示) -->
+<!-- 后台题目录入/编辑(A2,A8 起改为表单权威)
+     提交以表单为准:保存时把表单值覆盖到"库里原始 content/answer_key"的副本上,
+     表单没建模的键(含 content 的 id/type/source 与将来的校核标记)原样带回,不会被静默洗掉。
+     下方的「高级」面板默认只是提交内容的预览;管理员在里面动过手,才改以面板为准。 -->
 <template>
   <div class="qedit">
     <div class="qedit__head">
@@ -13,8 +15,20 @@
     </div>
 
     <n-alert v-if="manualJson" type="warning" :show-icon="false" class="qedit__notice">
-      你已手工编辑 JSON,上方表单可能与 JSON 不一致 —— 提交时以 JSON 面板为准。
+      你已在「高级」面板里手工编辑 JSON —— 本次提交以该面板为准，上方表单的改动不会再自动同步进去。
+      想回到"以表单为准"，点面板里的「从表单重新生成」。
     </n-alert>
+
+    <n-alert v-if="saveError" type="error" closable class="qedit__notice" @close="saveError = null">
+      <div class="qedit__error">
+        <strong>服务端拒绝了这次保存：</strong>{{ saveError }}
+        <span v-if="errorRowIndex !== null">（已定位到下方第 {{ errorRowIndex + 1 }} 行）</span>
+      </div>
+    </n-alert>
+
+    <p v-if="!manualJson && passthroughKeys.length" class="qedit__kept">
+      本题面还带着表单没有建模的字段（<code>{{ passthroughKeys.join('、') }}</code>），保存时按原样保留。
+    </p>
 
     <!-- 通用字段 -->
     <n-card size="small" title="基本信息" class="qedit__card">
@@ -88,9 +102,14 @@
         <n-input v-model:value="form.optionsText" type="textarea" :autosize="{ minRows: 5 }" />
       </template>
 
-      <div v-for="(row, index) in form.rows" :key="index" class="qedit__item">
+      <div
+        v-for="(row, index) in form.rows"
+        :key="index"
+        class="qedit__item"
+        :class="{ 'qedit__item--error': errorRowIndex === index }"
+      >
         <div class="qedit__item-head">
-          <n-tag size="small" :bordered="false" type="info">{{ index + 1 }}</n-tag>
+          <n-tag size="small" :bordered="false" type="info">编号 {{ rowIds[index] }}</n-tag>
           <span class="qedit__item-title">{{ rowTitle(index) }}</span>
           <n-button size="tiny" quaternary type="error" @click="form.rows.splice(index, 1)">删除本行</n-button>
         </div>
@@ -112,18 +131,26 @@
           </div>
         </template>
 
-        <div class="qedit__row2">
-          <div>
-            <label class="qedit__label">
-              {{ form.type === 'grammar-fill' ? '标准答案' : '正确选项 key' }}
-            </label>
-            <n-input v-model:value="row.answer" size="small" :placeholder="form.type === 'grammar-fill' ? 'working' : 'B'" />
-          </div>
-          <div v-if="form.type === 'grammar-fill'">
-            <label class="qedit__label">可接受变体(逗号分隔)</label>
-            <n-input v-model:value="row.alternativesText" size="small" />
-          </div>
+        <label class="qedit__label">
+          {{ form.type === 'grammar-fill' ? '标准答案' : '正确选项 key' }}
+        </label>
+        <n-input v-model:value="row.answer" size="small" :placeholder="form.type === 'grammar-fill' ? 'working' : 'B'" />
+
+        <!-- 可接受变体:判分正确性的瓶颈,独立成区块而不是藏在答案旁边的小格
+             (A8 依据:题库 30 个空只有 2 个填了真正有效的变体,真题卷 10 个空一个没填,
+              而比对是纯字符串 —— 少填一个写法,学生就可能答对却判错) -->
+        <div v-if="form.type === 'grammar-fill'" class="qedit__alt">
+          <label class="qedit__label qedit__label--strong">可接受变体（逗号分隔）</label>
+          <n-input v-model:value="row.alternativesText" size="small" placeholder="如 worked, had worked" />
+          <p class="qedit__alt-note">
+            除标准答案外，判分还会接受这里写下的写法。这一空可能存在别的正确答案（同义写法、两种时态都说得通）就填上；
+            只影响这一空，不会改动标准答案。大小写差异已由「答题设置」里的大小写开关兜住，不必在此重复。
+          </p>
         </div>
+        <p v-else-if="form.type !== 'reading'" class="qedit__alt-note">
+          本题型按字符串精确比对（阅读/完形/五选五比的是选项 key），暂不支持可接受变体。
+        </p>
+
         <label class="qedit__label">解析</label>
         <n-input v-model:value="row.explanation" size="small" />
       </div>
@@ -133,26 +160,41 @@
       </n-button>
     </n-card>
 
-    <!-- 原始 JSON 面板(复杂结构兜底;提交时以此为准) -->
-    <n-card size="small" title="提交内容(原始 JSON,可直接编辑)" class="qedit__card">
-      <div class="qedit__json-actions">
-        <n-button size="tiny" @click="syncFromForm">从表单重新生成</n-button>
-        <span class="qedit__hint">服务端会做五道校验:结构、答案防呆、编号集合一致、答案合法、占位符一致</span>
-      </div>
-      <label class="qedit__label">content(下发内容,禁止含 answer/explanation/sampleAnswer)</label>
-      <n-input v-model:value="contentJson" type="textarea" :autosize="{ minRows: 6 }" @update:value="manualJson = true" />
-      <label class="qedit__label">answer_key(答案与解析)</label>
-      <n-input v-model:value="answerKeyJson" type="textarea" :autosize="{ minRows: 4 }" @update:value="manualJson = true" />
-    </n-card>
+    <!-- 高级:提交内容的 JSON 视图。默认只是"将要提交什么"的预览(表单为权威);
+         管理员在这里动过手才反客为主,界面顶部会给出对应的提示。 -->
+    <n-collapse class="qedit__card">
+      <n-collapse-item :title="advancedTitle" name="advanced">
+        <div class="qedit__json-actions">
+          <n-button size="tiny" @click="syncFromForm">从表单重新生成</n-button>
+          <span class="qedit__hint">服务端会做五道校验:结构、答案防呆、编号集合一致、答案合法、占位符一致</span>
+        </div>
+        <label class="qedit__label">content(下发内容,禁止含 answer/explanation/sampleAnswer)</label>
+        <n-input v-model:value="contentJson" type="textarea" :autosize="{ minRows: 6 }" @update:value="manualJson = true" />
+        <label class="qedit__label">answer_key(答案与解析)</label>
+        <n-input v-model:value="answerKeyJson" type="textarea" :autosize="{ minRows: 4 }" @update:value="manualJson = true" />
+      </n-collapse-item>
+    </n-collapse>
   </div>
 </template>
 
 <script setup lang="ts">
 // 路由参数 id 存在即为编辑模式:GET /api/admin/questions/{id} 反填表单
 // 保存:新建 POST /api/admin/questions;更新 PUT /api/admin/questions/{id}
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NAlert, NButton, NCard, NInput, NInputNumber, NSpace, NSelect, NTag, useMessage } from 'naive-ui'
+import {
+  NAlert,
+  NButton,
+  NCard,
+  NCollapse,
+  NCollapseItem,
+  NInput,
+  NInputNumber,
+  NSpace,
+  NSelect,
+  NTag,
+  useMessage,
+} from 'naive-ui'
 import {
   createAdminQuestion,
   getAdminQuestion,
@@ -161,7 +203,13 @@ import {
 import type { AdminQuestionPayload, AdminSourceType } from '@/types/admin'
 import type { PracticeType } from '@/types/practice'
 
-/** 行模型:阅读小题或各类空位(编号由数组顺序决定,与前端契约一致) */
+/**
+ * 行模型:阅读小题或各类空位。
+ *
+ * <p>三个 `original*` 字段是 passthrough 的依据(A8):编辑已有题时把库里那条 item 原样记住,
+ * 保存时以它打底再用表单值覆盖,这样表单没建模的键(如以后 A10 加的校核标记)不会被静默洗掉,
+ * 原本的 `id` 编号与 `acceptAlternatives` 的原始形状(null / [] / 缺键)也不会被重排或改写。</p>
+ */
 interface RowModel {
   stem: string
   hint: string
@@ -169,6 +217,12 @@ interface RowModel {
   answer: string
   alternativesText: string
   explanation: string
+  /** 库里 content 对应项原样(未加载到则为 null,新建行也是 null) */
+  originalContentItem: Record<string, unknown> | null
+  /** 库里 answer_key 对应项原样 */
+  originalKeyItem: Record<string, unknown> | null
+  /** 加载时由原始 acceptAlternatives 推导出的文本,用于判断"这一格有没有被动过" */
+  originalAlternativesText: string
 }
 
 const route = useRoute()
@@ -180,9 +234,19 @@ const editId = computed(() => String(route.params.id ?? ''))
 const isEdit = computed(() => editId.value !== '')
 
 const saving = ref(false)
+/** true = 管理员在「高级」面板里动过 JSON,此时以面板内容为准提交 */
 const manualJson = ref(false)
 const contentJson = ref('{}')
 const answerKeyJson = ref('{}')
+
+/** 库里原始 content / answer_key(passthrough 打底的依据;新建模式为空对象) */
+const originalContent = ref<Record<string, unknown>>({})
+const originalAnswerKey = ref<Record<string, unknown>>({})
+/** 编辑模式反填期间为 true:此时表单的变动不该触发面板重生成 */
+const hydrating = ref(false)
+/** 服务端拒绝保存时留下的原文与命中的表单行下标(内联展示,不只在 toast 里一闪而过) */
+const saveError = ref<string | null>(null)
+const errorRowIndex = ref<number | null>(null)
 
 const form = reactive({
   id: '',
@@ -232,7 +296,7 @@ function rowTitle(index: number): string {
   return `第 ${index + 1} 空(语法填空)`
 }
 
-/** 新建一行:阅读/完形带四个选项,其余留空 */
+/** 新建一行:阅读/完形带四个选项,其余留空;新增行没有"原始项",保存时按末尾续编号 */
 function newRow(): RowModel {
   const withOptions = form.type === 'reading' || form.type === 'cloze'
   return {
@@ -242,6 +306,9 @@ function newRow(): RowModel {
     answer: '',
     alternativesText: '',
     explanation: '',
+    originalContentItem: null,
+    originalKeyItem: null,
+    originalAlternativesText: '',
   }
 }
 
@@ -276,59 +343,165 @@ function splitList(text: string): string[] {
     .filter(Boolean)
 }
 
-/** 由表单生成 content 与 answer_key 两个对象 */
+/**
+ * 表单负责建模的键。不在这些清单里的键(content 的 `id`/`type`/`source` 也算在内,
+ * 以及以后 A10 可能加的校核标记)一律从库里原样带回 —— 这就是 A8 的未知字段 passthrough。
+ */
+const CONTENT_MODELED = ['passage', 'prompt', 'requirements', 'wordLimit', 'scoringDimensions', 'questions', 'blanks', 'options']
+const KEY_MODELED = ['sampleAnswer', 'questions', 'blanks']
+
+/** 原始项里的编号;没有或不是数字时返回 null(由续号逻辑补) */
+function originalIdOf(original: Record<string, unknown> | null): number | null {
+  if (!original || original.id === undefined || original.id === null) return null
+  const asNumber = Number(original.id)
+  return Number.isInteger(asNumber) ? asNumber : null
+}
+
+/**
+ * 编号策略:库里原编号照原样用,只有新增行才从当前最大编号往后续(空题库从 1 起)。
+ * 旧实现一律按数组顺序重排成 `index + 1`,于是"打开老题什么都不改"也会改写编号。
+ */
+function resolveRowIds(rows: RowModel[]): number[] {
+  const existing = rows.map((row) => originalIdOf(row.originalContentItem ?? row.originalKeyItem))
+  let highest = 0
+  for (const id of existing) {
+    if (id !== null && id > highest) highest = id
+  }
+  let next = highest
+  return existing.map((id) => {
+    if (id !== null) return id
+    next += 1
+    return next
+  })
+}
+
+/** 顶层合并:原始打底 → 删掉表单已清空/不适用的建模键 → 表单值覆盖 */
+function mergeTop(
+  original: Record<string, unknown>,
+  built: Record<string, unknown>,
+  modeled: string[]
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...original }
+  for (const key of modeled) {
+    if (!(key in built)) delete out[key]
+  }
+  return { ...out, ...built }
+}
+
+/** 单条 item 合并:原始 item 打底,未知键随之带回;`removed` 表示"表单明确清空了它" */
+function mergeItem(
+  original: Record<string, unknown> | null,
+  built: Record<string, unknown>,
+  removed: string[] = []
+): Record<string, unknown> {
+  const base: Record<string, unknown> = { ...(original ?? {}) }
+  for (const key of removed) delete base[key]
+  return { ...base, ...built }
+}
+
+/** 由原始 acceptAlternatives 推导表单文本(null / 缺键 → 空串,[] 同样是空串) */
+function alternativesTextOf(item: Record<string, unknown> | null): string {
+  const raw = item?.acceptAlternatives
+  return Array.isArray(raw) ? raw.map((one) => String(one)).join(',') : ''
+}
+
+/** 由表单生成"将要提交"的 content 与 answer_key(已合并库里原始内容) */
 function buildPayloads(): { content: Record<string, unknown>; answerKey: Record<string, unknown> } {
-  const content: Record<string, unknown> = {}
-  const answerKey: Record<string, unknown> = {}
+  const ids = resolveRowIds(form.rows)
 
   if (form.type === 'writing') {
-    content.prompt = form.prompt
-    content.requirements = form.requirementsText.split('\n').map((l) => l.trim()).filter(Boolean)
-    content.wordLimit = form.wordLimit
-    content.scoringDimensions = splitList(form.dimensionsText)
+    const builtKey: Record<string, unknown> = {}
     if (form.sampleAnswer.trim()) {
-      answerKey.sampleAnswer = form.sampleAnswer.trim()
+      builtKey.sampleAnswer = form.sampleAnswer.trim()
     }
-    return { content, answerKey }
+    return {
+      content: mergeTop(originalContent.value, {
+        prompt: form.prompt,
+        requirements: form.requirementsText.split('\n').map((line) => line.trim()).filter(Boolean),
+        wordLimit: form.wordLimit,
+        scoringDimensions: splitList(form.dimensionsText),
+      }, CONTENT_MODELED),
+      answerKey: mergeTop(originalAnswerKey.value, builtKey, KEY_MODELED),
+    }
   }
 
-  content.passage = form.passage
-  if (form.type === 'reading') {
-    content.questions = form.rows.map((row, index) => ({
-      id: index + 1,
-      stem: row.stem,
-      options: row.options,
-    }))
-    answerKey.questions = form.rows.map((row, index) => ({
-      id: index + 1,
-      answer: row.answer.trim().toUpperCase(),
-      explanation: row.explanation,
-    }))
-    return { content, answerKey }
+  const itemsField = form.type === 'reading' ? 'questions' : 'blanks'
+  const builtContent: Record<string, unknown> = { passage: form.passage }
+  const builtKey: Record<string, unknown> = {}
+
+  if (form.type === 'matching') {
+    builtContent.options = parseOptions(form.optionsText)
   }
 
-  content.blanks = form.rows.map((row, index) => {
-    const blank: Record<string, unknown> = { id: index + 1 }
-    if (form.type === 'cloze') blank.options = row.options
-    if (form.type === 'grammar-fill' && row.hint.trim()) blank.hint = row.hint.trim()
-    return blank
+  builtContent[itemsField] = form.rows.map((row, index) => {
+    const built: Record<string, unknown> = { id: ids[index] }
+    const removed: string[] = []
+    if (form.type === 'reading') {
+      built.stem = row.stem
+      built.options = row.options
+    } else if (form.type === 'cloze') {
+      built.options = row.options
+      removed.push('stem', 'hint')
+    } else if (form.type === 'matching') {
+      removed.push('stem', 'hint', 'options')
+    } else {
+      // grammar-fill:提示词留空表示"这一空不给提示",要真的删掉而不是传空串
+      if (row.hint.trim()) built.hint = row.hint.trim()
+      else removed.push('hint')
+      removed.push('stem', 'options')
+    }
+    return mergeItem(row.originalContentItem, built, removed)
   })
-  if (form.type === 'matching') content.options = parseOptions(form.optionsText)
 
-  answerKey.blanks = form.rows.map((row, index) => {
-    const item: Record<string, unknown> = {
-      id: index + 1,
+  builtKey[itemsField] = form.rows.map((row, index) => {
+    const built: Record<string, unknown> = {
+      id: ids[index],
       answer: form.type === 'grammar-fill' ? row.answer.trim() : row.answer.trim().toUpperCase(),
       explanation: row.explanation,
     }
-    const alternatives = splitList(row.alternativesText)
-    if (form.type === 'grammar-fill' && alternatives.length > 0) item.acceptAlternatives = alternatives
-    return item
+    const removed: string[] = []
+    if (form.type === 'grammar-fill') {
+      const alternatives = splitList(row.alternativesText)
+      if (alternatives.length > 0) {
+        built.acceptAlternatives = alternatives
+      } else if (row.alternativesText !== row.originalAlternativesText) {
+        // 只有管理员真的清空过才删键;没动过时原形状(null / [] / 缺键)逐字保留
+        removed.push('acceptAlternatives')
+      }
+    }
+    return mergeItem(row.originalKeyItem, built, removed)
   })
-  return { content, answerKey }
+
+  return {
+    content: mergeTop(originalContent.value, builtContent, CONTENT_MODELED),
+    answerKey: mergeTop(originalAnswerKey.value, builtKey, KEY_MODELED),
+  }
 }
 
-/** 表单 → JSON 面板(单向同步;手工改过 JSON 后可点本按钮回到表单内容) */
+/** 每行实际会提交的编号(原编号沿用 + 新增行续号);界面据此显示真实题号而不是数组序号 */
+const rowIds = computed(() => resolveRowIds(form.rows))
+
+/** 「高级」折叠区标题:一眼看出当前谁做权威(默认表单;管理员动过面板则是面板) */
+const advancedTitle = computed(() =>
+  manualJson.value
+    ? '高级 · 直接编辑提交 JSON（当前以本面板为准）'
+    : '高级 · 本次将提交的 JSON（由表单生成，此处为预览）'
+)
+
+/**
+ * 表单没建模、正被原样带回的顶层键。
+ * `id`/`type`/`source` 不计入提示:它们虽然也走 passthrough 带回,但服务端一定会覆写(见 `AdminQuestionService`),
+ * 列出来只会让每条题都显示一串噪音,反而看不出"真的有自定义键被保住了"。
+ */
+const SERVER_OWNED_KEYS = ['id', 'type', 'source']
+const passthroughKeys = computed(() =>
+  [...Object.keys(originalContent.value), ...Object.keys(originalAnswerKey.value)].filter(
+    (key) =>
+      !CONTENT_MODELED.includes(key) && !KEY_MODELED.includes(key) && !SERVER_OWNED_KEYS.includes(key)
+  )
+)
+
+/** 表单 → JSON 面板(面板始终等于"此刻会提交的内容";手工改过 JSON 后可点本按钮回到表单内容) */
 function syncFromForm(): void {
   const { content, answerKey } = buildPayloads()
   contentJson.value = JSON.stringify(content, null, 2)
@@ -336,9 +509,10 @@ function syncFromForm(): void {
   manualJson.value = false
 }
 
-/** 编辑模式:详情反填表单与 JSON */
+/** 编辑模式:详情反填表单与 JSON(反填期间不让 watcher 重生成面板,见 A8 的覆盖 bug) */
 async function loadForEdit(id: string): Promise<void> {
   const detail = await getAdminQuestion(id)
+  hydrating.value = true
   form.id = detail.id
   form.type = detail.type
   form.sourceType = detail.sourceType
@@ -349,6 +523,9 @@ async function loadForEdit(id: string): Promise<void> {
 
   const content = (detail.content ?? {}) as Record<string, unknown>
   const answerKey = (detail.answerKey ?? {}) as Record<string, unknown>
+  // 留存原始对象:保存时以此打底,表单表达不出来的键才能被原样带回
+  originalContent.value = content
+  originalAnswerKey.value = answerKey
   form.passage = String(content.passage ?? '')
   form.prompt = String(content.prompt ?? '')
   form.wordLimit = Number(content.wordLimit ?? 120)
@@ -362,21 +539,28 @@ async function loadForEdit(id: string): Promise<void> {
   const keyItems = ((answerKey.questions ?? answerKey.blanks ?? []) as Record<string, unknown>[])
   const sourceItems = ((content.questions ?? content.blanks ?? []) as Record<string, unknown>[])
   form.rows = sourceItems.map((item) => {
-    const id = Number(item.id ?? 0)
-    const key = keyItems.find((entry) => Number(entry.id) === id) ?? {}
+    const itemId = Number(item.id ?? 0)
+    const key = keyItems.find((entry) => Number(entry.id) === itemId) ?? null
     const options = (item.options as { key: string; text: string }[]) ?? []
     return {
       stem: String(item.stem ?? ''),
       hint: String(item.hint ?? ''),
       options: options.map((option) => ({ key: option.key, text: option.text })),
-      answer: String(key.answer ?? ''),
-      alternativesText: ((key.acceptAlternatives as string[]) ?? []).join(','),
-      explanation: String(key.explanation ?? ''),
+      answer: String(key?.answer ?? ''),
+      alternativesText: alternativesTextOf(key),
+      explanation: String(key?.explanation ?? ''),
+      originalContentItem: item,
+      originalKeyItem: key,
+      originalAlternativesText: alternativesTextOf(key),
     }
   })
 
   contentJson.value = JSON.stringify(content, null, 2)
   answerKeyJson.value = JSON.stringify(answerKey, null, 2)
+  manualJson.value = false
+  // 反填造成的表单变动会被排进本次 flush 队列,等它跑完再放开同步,否则面板会被表单重写成与库里不一致
+  await nextTick()
+  hydrating.value = false
 }
 
 /** 保存前本地预检:答案键是否误填进 content、占位符与行号是否一致 */
@@ -397,18 +581,46 @@ function precheck(content: Record<string, unknown>): string | null {
   return null
 }
 
+/**
+ * 从服务端报错文本里取出出错的下标。
+ * `QuestionContentValidator` 的路径形如 `answer_key.blanks[3].answer 不能为空`,其中方括号是**数组下标(0 基)**,
+ * 不是题目编号 —— 而两个数组都由 `form.rows` 按序生成,所以下标可直接对应到表单行。
+ */
+function errorRowIndexOf(text: string): number | null {
+  const matched = /(?:content|answer_key)\.(?:blanks|questions)\[(\d+)]/.exec(text)
+  if (!matched) return null
+  const index = Number(matched[1])
+  return index >= 0 && index < form.rows.length ? index : null
+}
+
 async function onSave(): Promise<void> {
+  saveError.value = null
+  errorRowIndex.value = null
   let content: Record<string, unknown>
   let answerKey: Record<string, unknown>
-  try {
-    content = JSON.parse(contentJson.value) as Record<string, unknown>
-    answerKey = answerKeyJson.value.trim() ? (JSON.parse(answerKeyJson.value) as Record<string, unknown>) : {}
-  } catch {
-    message.error('JSON 面板存在语法错误,请先修正或点「从表单重新生成」')
-    return
+
+  if (manualJson.value) {
+    // 管理员在「高级」面板里动过 JSON:此时以面板为准(面板本来也由合并结果起步)
+    try {
+      content = JSON.parse(contentJson.value) as Record<string, unknown>
+      answerKey = answerKeyJson.value.trim() ? (JSON.parse(answerKeyJson.value) as Record<string, unknown>) : {}
+    } catch {
+      saveError.value = '高级面板里的 JSON 存在语法错误,请修正,或点「从表单重新生成」回到表单内容'
+      message.error(saveError.value)
+      return
+    }
+  } else {
+    // 表单为权威:提交"库里原始内容打底 + 表单覆盖"的合并结果,并让面板与之一致
+    const merged = buildPayloads()
+    content = merged.content
+    answerKey = merged.answerKey
+    contentJson.value = JSON.stringify(content, null, 2)
+    answerKeyJson.value = JSON.stringify(answerKey, null, 2)
   }
+
   const problem = precheck(content)
   if (problem) {
+    saveError.value = problem
     message.warning(problem)
     return
   }
@@ -435,16 +647,19 @@ async function onSave(): Promise<void> {
       message.success(`已创建:${created.id}`)
     }
     router.push('/admin/questions')
-  } catch {
-    /* 服务端校验失败的具体原因由 request 层弹出(含定位路径) */
+  } catch (error) {
+    // request 层已经弹过一次 toast,但带路径的校验信息一闪而过就没人能改了 —— 这里把它钉在页面上并定位到行
+    const text = error instanceof Error ? error.message : String(error)
+    saveError.value = text
+    errorRowIndex.value = errorRowIndexOf(text)
   } finally {
     saving.value = false
   }
 }
 
-// 表单任何改动都重新生成 JSON(除非用户已手工编辑,避免覆盖其改动)
+// 表单任何改动都重新生成面板(管理员已手工编辑 JSON 时不覆盖其改动;反填期间挂起)
 watch(form, () => {
-  if (!manualJson.value) syncFromForm()
+  if (!manualJson.value && !hydrating.value) syncFromForm()
 }, { deep: true })
 
 onMounted(async () => {
@@ -549,5 +764,47 @@ onMounted(async () => {
   font-size: 12px;
   opacity: 0.7;
   font-weight: 400;
+}
+
+/* 服务端拒绝保存时命中的那一行:红框 + 顶部保留报错文本,让人知道去改哪里 */
+.qedit__item--error {
+  border-color: var(--lc-error, #d03050);
+  box-shadow: inset 0 0 0 1px rgba(208, 48, 80, 0.35);
+}
+
+/* 可接受变体独立成区块(判分正确性相关,不该藏在角落) */
+.qedit__alt {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(96, 149, 235, 0.55);
+  border-radius: 8px;
+  background: rgba(96, 149, 235, 0.06);
+}
+
+.qedit__alt .qedit__label {
+  margin-top: 0;
+}
+
+.qedit__alt-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.72;
+}
+
+.qedit__label--strong {
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+/* passthrough 生效说明:表单表达不出的键仍会被原样保留 */
+.qedit__kept {
+  margin: 0 0 12px;
+  font-size: 12px;
+  opacity: 0.72;
+}
+
+.qedit__error strong {
+  font-weight: 600;
 }
 </style>

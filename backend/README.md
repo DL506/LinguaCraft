@@ -70,6 +70,7 @@ cd backend
   写入前由共享组件 **`service/QuestionContentValidator`** 做五道校验(结构、`content` 递归禁答案类键、`content` 与 `answer_key` 编号集合相等、客观题答案落在候选内、`passage` 的 `[[n]]` 与空位编号一致),
   任一不过返回 `code:400` 且 `message` 带定位路径;`content.id/type/source` 与分值(`PracticeRules` 按题型默认映射)一律由服务端覆写,题型创建后不可变更,删除带提交/错题引用保护。
   CORS 的 `allowedMethods` 在 `WebConfig` 与 `SecurityConfig` **两处都要含 PATCH**。背景见 `docs/verification/A2-后台题库管理.md`。
+- 录入表单权威性(阶段 A8):前端录入页**以表单为权威**提交"库里原始 `content`/`answer_key` 打底 + 表单覆盖",因此服务端必须**原样保留请求里它没建模的键**(自定义键、将来的校核标记等),只覆写 `id/type/source` 三个权威字段;这条契约由 `AdminQuestionServiceTest` 锁住(含"请求不带 `sourceMeta` 时沿用库值,且 `content.source` 与 `source_meta` 同源")。服务端不做键白名单 —— 白名单会让任何新增键被静默洗掉。背景见 `docs/verification/A8-题目录入表单权威化.md`。
 - AI(阶段 A3 起):出题与判分统一经 `AiChatService`(超时 `lc.ai.timeout-seconds`,失败即 `code=500` 可重试);
   **AI 出题与后台录入共用 `QuestionContentValidator`**,校验不过不落库,因此不会出现"AI 静默写入脏题"。
   端点与密钥经环境变量注入(`LC_AI_API_KEY`/`LC_AI_BASE_URL`/`LC_AI_MODEL`,样例 `backend/.env.example`,本地实值放不入库的 `backend/.env.local`);
