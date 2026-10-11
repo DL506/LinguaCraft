@@ -7,6 +7,7 @@
 - `frontend/` 前端(Vue 3 + Vite + TS + Naive UI,PWA;开发期含 MSW mock,详见 frontend/README.md)
 - `backend/` 后端(Spring Boot 4 + Spring AI + MyBatis-Plus + MySQL;启动/环境变量/SQL 初始化详见 backend/README.md)
 - `任务书-r1/r2/r3.md` 项目规格文档(r3 为终检版)
+- `交接与后续计划.md` **当前进度快照、已验证事实与 A8–A11 待实现计划**(换人/换会话先读这份)
 
 ## 后端快速开始(详细见 backend/README.md)
 
