@@ -37,6 +37,11 @@ spring:
       chat:
         options:
           model: ${LC_AI_MODEL:fake-model}
+          # HTTP 层的请求上限。A10 校核一道 10 空的题要 60~90 秒,默认 60s 会在读响应中途被切断
+          # (报 OpenAIInvalidDataException: Error reading response)。三个同名属性里只有这一档实测生效:
+          # 只改 spring.ai.openai.timeout 或 spring.ai.openai.chat.timeout 都仍是 60 秒断。
+          # 注意还要配合 lc.ai.review-timeout-seconds(应用层 Future 等待),两层都得放宽,见下面 lc.ai 段。
+          timeout: 180s
 
   # ===== 邮件(Step 2 找回密码使用;未配置时降级为日志输出重置链接,届时取消注释)=====
   # mail:
@@ -87,3 +92,7 @@ lc:
   ai:
     # AI 调用超时(秒):作文评分超时降级 pending;出题失败返回可重试错误
     timeout-seconds: 60
+    # 单批校核的等待上限(秒,阶段 A10)。校核受两层 60 秒限制:上面 spring.ai.openai.chat.options.timeout 是
+    # HTTP 层,这里是应用层 Future —— 实测只放宽任意一层都仍然失败,所以两层都要给到 180。
+    # 出题/判分不读这一项,它们的 60 秒口径不变。
+    review-timeout-seconds: 180

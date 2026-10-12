@@ -3,6 +3,7 @@ package com.linguacraft.backend.ai;
 import tools.jackson.databind.JsonNode;
 import com.linguacraft.backend.entity.Question;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -120,6 +121,67 @@ public final class PromptTemplates {
                  "sampleAnswer":"参考范文(英文,120 词左右)",
                  "overallComment":"总评(中文,含优点与改进建议)"}
                 要求:dimensions 覆盖题目的评分维度列表,各维度分数之和等于 totalScore,totalScore 不超过满分 15 的整数或一位小数。""" + JSON_ONLY;
+    }
+
+    /**
+     * 题目校核提示词(阶段 A10):对"已经写好的一道题"做三类检查。
+     *
+     * <p>与出题提示词的关键差别:这里不产出新题,只评判现有答案与解析,所以要求模型
+     * <b>不得新增编号</b>(否则前端无法对回表单的行)。三类检查各自的边界写在提示词里:</p>
+     * <ul>
+     *   <li>{@code alternatives}:只有语法填空需要,且只允许填"确实该判对"的写法 ——
+     *       判分是纯字符串比对,塞进错误写法会直接放过错答;</li>
+     *   <li>{@code answerRisk}:标准答案本身是否可疑(可能选错、可能不唯一)。
+     *       服务端与前端都<b>不会</b>据此自动改答案,只作为提醒;</li>
+     *   <li>{@code explanationRisk}:解析与答案是否一致、是否过简,建议解析只在管理员采纳时写入。</li>
+     * </ul>
+     *
+     * <p>分批评故:{@code answerKey} 只是本题的一部分(见 {@code AiReviewService#REVIEW_CHUNK_SIZE}),
+     * 而题面是完整的。不告诉模型这一点,它会回报"answer_key 缺了 1-5 空"这种<b>假问题</b>
+     * (实测出现过),管理员看了会以为题目坏了。所以必须显式给出本批编号范围。</p>
+     *
+     * @param type      题型
+     * @param content   题面 JSON(可含未通过闸门的内容,校核正是要在它入库前看)
+     * @param answerKey 本批答案 JSON
+     * @param batchIds  本批要校核的编号(题面里其它编号属其它批次)
+     * @return 提示词
+     */
+    public static String reviewPrompt(String type, JsonNode content, JsonNode answerKey, List<Integer> batchIds) {
+        boolean grammar = "grammar-fill".equals(type);
+        String alternativeRule = grammar
+                ? "- alternatives:除标准答案外,这个空还应该判对的写法(如 another/another one 这类同义写法、"
+                        + "两种都说得通的时态)。只填你确信的,不确定的就不填;大小写差异不要写进来(系统已有大小写开关);"
+                : "- 本题型按选项 key 精确比对,alternatives 一律返回空数组。";
+        // 刻意用紧凑 JSON(不是 toPrettyString):校核要带完整题面与答案,缩进会白耗一成输入 token
+        return """
+                你是严谨的英语命题与阅卷双岗老师,现在请校核一道已经写好的题目,只找问题、不要重写题目。
+                题型:""" + type + """
+
+                本批只校核这些编号:""" + batchIds + """
+                (题面是完整的,但其中不属于上述编号的空位/小题由别的批次负责,本批一律不评、也不要报告"答案缺失"。)
+
+                题面 content(JSON,不含答案):
+                """ + (content == null ? "{}" : content.toString()) + """
+
+                本批答案 answer_key(JSON):
+                """ + (answerKey == null ? "{}" : answerKey.toString()) + """
+
+                输出 JSON 结构:
+                {"summary":"本批一句话结论(中文,不超过40字)",
+                 "items":[{"id":1,"alternatives":[],"answerRisk":"ok","explanationRisk":"ok","explanation":"","note":""}]}
+
+                硬性要求:
+                - items 只能包含上述本批编号,一个不多一个不少;不要出现别的编号,也不要合并多项;
+                - answerRisk 只能取 ok / mayBeWrong / notUnique:
+                  mayBeWrong = 按题面看这个标准答案本身可能是错的;
+                  notUnique = 题面语境下还有另一个明显也成立的答案,纯字符串比对会误判;
+                - explanationRisk 只能取 ok / mismatch / tooThin:mismatch = 解析与答案不一致或答非所问,
+                  tooThin = 解析过简、学生看不懂为什么选它;
+                - note 与 explanation 都要简短(note 不超过30字),没有问题的编号两者都留空字符串;
+                - 只有当 answerRisk 或 explanationRisk 不是 ok 时,才在 note 里写清具体理由;
+                  需要改写解析时把改写后的中文解析放进 explanation,否则该字段留空字符串。""" + alternativeRule + """
+                - 不要为了凑问题而编造问题:确实没问题就全填 ok、note 留空;
+                - 绝对不要输出除这个 JSON 以外的任何文字,不要使用代码块围栏。""" + JSON_ONLY;
     }
 
     /**

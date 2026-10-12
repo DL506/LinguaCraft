@@ -82,6 +82,31 @@ export interface AdminAiDraft {
   sourceMeta?: Record<string, unknown>
 }
 
+/** AI 校核单编号建议(POST /api/admin/questions/ai-review,阶段 A10;服务端已清洗且不写库) */
+export interface AdminAiReviewItem {
+  /** 题号/空位编号(对应表单行的编号) */
+  id: number
+  /** 建议的可接受写法(非语法填空恒为空数组) */
+  alternatives?: string[]
+  /** 标准答案风险:ok / mayBeWrong / notUnique —— 只提醒,不自动改答案 */
+  answerRisk?: 'ok' | 'mayBeWrong' | 'notUnique'
+  /** 解析风险:ok / mismatch / tooThin */
+  explanationRisk?: 'ok' | 'mismatch' | 'tooThin'
+  /** 建议改写后的中文解析(空表示不必改写) */
+  explanation?: string
+  /** 一句话理由 */
+  note?: string
+}
+
+/** AI 校核结果(建议清单,未写库) */
+export interface AdminAiReview {
+  type: PracticeType
+  summary?: string
+  items?: AdminAiReviewItem[]
+  /** 被服务端丢弃的建议数(编号对不上当前答案),用于如实提示模型还返回了无法对应的内容 */
+  droppedCount?: number
+}
+
 /** 管理端批改队列列表项(GET /api/admin/submissions) */
 export interface AdminSubmissionListItem {
   id: number

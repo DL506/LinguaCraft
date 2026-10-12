@@ -5,6 +5,7 @@ import { del, get, patch, post, put, upload } from './request'
 import type {
   AdminPing,
   AdminAiDraft,
+  AdminAiReview,
   AdminDashboard,
   AdminExamSubmissionDetail,
   AdminExamPaper,
@@ -200,6 +201,19 @@ export function createAdminQuestion(payload: AdminQuestionPayload): Promise<Admi
  */
 export function generateAdminAiDraft(type: string): Promise<AdminAiDraft> {
   return post<AdminAiDraft>('/admin/questions/ai-draft', { type })
+}
+
+/**
+ * AI 校核当前题目(阶段 A10):把表单此刻的 content/answer_key 交给服务端出建议清单。
+ * 不读库也不写库 —— 未保存的新题与 AI 草稿同样能校核;建议由管理员逐项采纳写入表单,仍需点保存才落库。
+ * 写作题没有可比对的答案项,服务端会返回 code=400 提示改用「AI 预评」。
+ */
+export function reviewAdminAiQuestion(payload: {
+  type: string
+  content: Record<string, unknown>
+  answerKey?: Record<string, unknown>
+}): Promise<AdminAiReview> {
+  return post<AdminAiReview>('/admin/questions/ai-review', payload)
 }
 
 /** 更新题目(整条覆盖 content 与 answer_key;题型不可变) */

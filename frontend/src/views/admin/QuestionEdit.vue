@@ -16,13 +16,21 @@
           </template>
           让 AI 出一道新题的草稿填进下面的表单。草稿<b>不入库</b>：改完点「创建题目」才落库、才对学生可见。
         </n-tooltip>
+        <n-button size="small" :loading="reviewing" @click="onReview">
+          AI 校核本题
+        </n-button>
         <n-button size="small" type="primary" :loading="saving" @click="onSave">
           {{ isEdit ? '保存修改' : '创建题目' }}
         </n-button>
       </n-space>
     </div>
 
-    <n-alert v-if="generating" type="info" :show-icon="false" class="qedit__notice">
+    <n-alert v-if="reviewing" type="info" :show-icon="false" class="qedit__notice">
+      AI 正在分批校核本题（每批最多 5 个编号，一批约 15~40 秒；10 空的语法填空约需 1 分钟）。
+      这一步只出建议，不会改动任何数据。
+    </n-alert>
+
+    <n-alert v-else-if="generating" type="info" :show-icon="false" class="qedit__notice">
       AI 正在出题，通常 10~40 秒，最长约 2 分钟（超时或结构不合格会自动重试一次）。这期间可以继续，但请先别点保存。
     </n-alert>
 
@@ -196,6 +204,79 @@
         <n-input v-model:value="answerKeyJson" type="textarea" :autosize="{ minRows: 4 }" @update:value="manualJson = true" />
       </n-collapse-item>
     </n-collapse>
+
+    <!-- AI 校核建议抽屉(阶段 A10):逐编号列建议,可采纳的只有"可接受变体"和"解析"两类;
+         答案风险只提醒不自动改 —— 答案键影响此后所有学生,必须经人。全程不写库。 -->
+    <n-drawer v-model:show="reviewShow" :width="isMobile ? '100%' : 620" placement="right">
+      <n-drawer-content :title="`AI 校核建议 · ${reviewConcerns} 项提醒`" closable :native-scrollbar="false">
+        <p v-if="review?.summary" class="rv__summary">{{ review.summary }}</p>
+        <p v-if="review?.droppedCount" class="rv__dropped">
+          模型另有 {{ review.droppedCount }} 条建议对不上当前编号,已忽略(通常是它自己编了题号)。
+        </p>
+        <p v-if="!reviewActionable.length" class="rv__empty">
+          {{ review?.items?.length ? '模型回报本题各编号均无问题，没有可采纳的建议。' : '没有可采纳的建议。' }}
+        </p>
+
+        <p v-if="reviewActionable.length" class="rv__counts">
+          {{ reviewActionable.length }} 个编号有建议或提醒，其余 {{ reviewQuietCount }} 个编号校核后无问题（未列出）。
+        </p>
+        <div v-for="item in reviewActionable" :key="item.id" class="rv__item">
+          <div class="rv__head">
+            <n-tag size="small" :bordered="false" type="info">编号 {{ item.id }}</n-tag>
+            <span v-if="rowIndexByNumber(item.id) < 0" class="rv__orphan">该编号已不在当前表单中,无法采纳</span>
+            <n-tag v-if="item.answerRisk && item.answerRisk !== 'ok'" size="small" type="error" :bordered="false">
+              {{ item.answerRisk === 'notUnique' ? '答案可能不唯一' : '答案可能选错' }}
+            </n-tag>
+            <n-tag v-if="item.explanationRisk && item.explanationRisk !== 'ok'" size="small" type="warning" :bordered="false">
+              {{ item.explanationRisk === 'mismatch' ? '解析与答案不一致' : '解析过简' }}
+            </n-tag>
+          </div>
+          <p v-if="item.note" class="rv__note">{{ item.note }}</p>
+
+          <div v-if="item.alternatives?.length" class="rv__row">
+            <span class="rv__label">建议的可接受写法</span>
+            <n-tag v-for="value in item.alternatives" :key="value" size="small" :bordered="false">{{ value }}</n-tag>
+            <n-button
+              size="tiny"
+              type="primary"
+              ghost
+              :disabled="adopted[`alt-${item.id}`] || rowIndexByNumber(item.id) < 0"
+              @click="adoptAlternatives(item)"
+            >
+              {{ adopted[`alt-${item.id}`] ? '已采纳' : '采纳' }}
+            </n-button>
+          </div>
+
+          <div v-if="item.explanation" class="rv__row rv__row--expl">
+            <span class="rv__label">建议解析</span>
+            <p class="rv__text">{{ item.explanation }}</p>
+            <n-button
+              size="tiny"
+              type="primary"
+              ghost
+              :disabled="adopted[`expl-${item.id}`] || rowIndexByNumber(item.id) < 0"
+              @click="adoptExplanation(item)"
+            >
+              {{ adopted[`expl-${item.id}`] ? '已采纳' : '采纳(替换该行为准)' }}
+            </n-button>
+          </div>
+
+          <p v-if="item.answerRisk && item.answerRisk !== 'ok'" class="rv__hint">
+            答案不由 AI 改动：请自己核对题面后在表单里改，或给这个空补上可接受写法。
+          </p>
+        </div>
+
+        <template #footer>
+          <div class="rv__footer">
+            <span class="rv__count">已采纳 {{ adoptedCount }} 项 · 仍需点「{{ isEdit ? '保存修改' : '创建题目' }}」才对学生生效</span>
+            <n-space size="small">
+              <n-button size="small" :disabled="!reviewConcerns" @click="adoptAllSafe">采纳全部安全项</n-button>
+              <n-button size="small" @click="reviewShow = false">关闭</n-button>
+            </n-space>
+          </div>
+        </template>
+      </n-drawer-content>
+    </n-drawer>
   </div>
 </template>
 
@@ -210,6 +291,8 @@ import {
   NCard,
   NCollapse,
   NCollapseItem,
+  NDrawer,
+  NDrawerContent,
   NInput,
   NInputNumber,
   NSpace,
@@ -222,10 +305,17 @@ import {
   createAdminQuestion,
   generateAdminAiDraft,
   getAdminQuestion,
+  reviewAdminAiQuestion,
   updateAdminQuestion,
 } from '@/api/admin'
-import type { AdminQuestionPayload, AdminSourceType } from '@/types/admin'
+import type {
+  AdminAiReview,
+  AdminAiReviewItem,
+  AdminQuestionPayload,
+  AdminSourceType,
+} from '@/types/admin'
 import type { PracticeType } from '@/types/practice'
+import { useDevice } from '@/composables/useDevice'
 
 /**
  * 行模型:阅读小题或各类空位。
@@ -252,6 +342,8 @@ interface RowModel {
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+/** 抽屉宽度按端切换(校核建议条目在窄屏需要全宽才看得完) */
+const { isMobile } = useDevice()
 
 /** 编辑目标 ID(新建时为空串) */
 const editId = computed(() => String(route.params.id ?? ''))
@@ -277,6 +369,14 @@ const generating = ref(false)
 const draftInfo = ref<{ model: string; generatedAt: string } | null>(null)
 /** 草稿带来的来源 meta(模型名与生成时刻),保存时随 sourceType=ai 原样带回 */
 const draftSourceMeta = ref<Record<string, unknown> | null>(null)
+
+/** AI 校核状态(阶段 A10):建议清单只在抽屉与表单之间流动,全程不写库 */
+const reviewing = ref(false)
+const reviewShow = ref(false)
+const review = ref<AdminAiReview | null>(null)
+const reviewError = ref<string | null>(null)
+/** 已采纳标记,键为 `alt-<编号>` / `expl-<编号>`(整体替换以触发数组/对象响应式) */
+const adopted = ref<Record<string, boolean>>({})
 
 const form = reactive({
   id: '',
@@ -649,6 +749,101 @@ function formatDraftTime(raw: string): string {
   return matched ? `${matched[2]}-${matched[3]} ${matched[4]}:${matched[5]}` : ''
 }
 
+/**
+ * AI 校核本题(阶段 A10):把**表单当前内容**交给服务端出建议,采纳后仍需点保存才落库。
+ *
+ * <p>三个刻意的设计:</p>
+ * <ul>
+ *   <li>送检的是 `buildPayloads()` 的结果(与保存时会提交的内容一致),不是库里的旧版本 ——
+ *       所以新建题与 AI 草稿在保存前就能校核;</li>
+ *   <li>{@code answerRisk} <b>没有采纳按钮</b>:答案键影响此后所有学生,AI 只能提醒,改与不改由人决定;</li>
+ *   <li>变体采纳是"并集"而不是"覆盖",避免把管理员已经手填的写法冲掉。</li>
+ * </ul>
+ */
+async function onReview(): Promise<void> {
+  const { content, answerKey } = buildPayloads()
+  reviewing.value = true
+  reviewError.value = null
+  review.value = null
+  try {
+    const result = await reviewAdminAiQuestion({ type: form.type, content, answerKey })
+    review.value = result
+    adopted.value = {}
+    reviewShow.value = true
+    if (!result.items?.length) {
+      message.info(result.droppedCount
+        ? `模型返回的 ${result.droppedCount} 条建议都对不上当前编号,已忽略`
+        : '没有发现问题,也没有新的可采纳建议')
+    }
+  } catch (error) {
+    reviewError.value = error instanceof Error ? error.message : String(error)
+    message.error(reviewError.value)
+  } finally {
+    reviewing.value = false
+  }
+}
+
+/** 按建议编号找表单行下标(编号来自 rowIds,与行上显示的「编号 N」一致) */
+function rowIndexByNumber(id: number): number {
+  return rowIds.value.indexOf(id)
+}
+
+/** 采纳可接受变体:与已有写法取并集,并剔除与该空标准答案相同的项 */
+function adoptAlternatives(item: AdminAiReviewItem): void {
+  const index = rowIndexByNumber(item.id)
+  if (index < 0 || !item.alternatives?.length) return
+  const row = form.rows[index]
+  const answer = row.answer.trim()
+  const merged: string[] = []
+  for (const value of [...splitList(row.alternativesText), ...item.alternatives]) {
+    const token = value.trim()
+    if (token && token !== answer && !merged.includes(token)) {
+      merged.push(token)
+    }
+  }
+  row.alternativesText = merged.join(', ')
+  adopted.value = { ...adopted.value, [`alt-${item.id}`]: true }
+}
+
+/** 采纳解析建议(整条替换,管理员可再手改) */
+function adoptExplanation(item: AdminAiReviewItem): void {
+  const index = rowIndexByNumber(item.id)
+  if (index < 0 || !item.explanation) return
+  form.rows[index].explanation = item.explanation
+  adopted.value = { ...adopted.value, [`expl-${item.id}`]: true }
+}
+
+/** 一键采纳所有安全项(只改变体与解析,绝不碰答案与编号) */
+function adoptAllSafe(): void {
+  for (const item of review.value?.items ?? []) {
+    if (item.alternatives?.length) adoptAlternatives(item)
+    if (item.explanation) adoptExplanation(item)
+  }
+}
+
+/** 有风险提醒或可采纳建议的行数(用于抽屉标题与按钮提示) */
+function hasSubstance(item: AdminAiReviewItem): boolean {
+  return (item.alternatives?.length ?? 0) > 0
+    || Boolean(item.explanation)
+    || item.answerRisk === 'mayBeWrong'
+    || item.answerRisk === 'notUnique'
+    || item.explanationRisk === 'mismatch'
+    || item.explanationRisk === 'tooThin'
+}
+const reviewConcerns = computed(() => (review.value?.items ?? []).filter(hasSubstance).length)
+
+/**
+ * 抽屉里真正要列的建议。
+ *
+ * <p>模型对"没问题"的编号也会回一条全 ok 的记录(实测 10 空题回满 10 条),
+ * 原样列出来就是 9 行空白壳 + 1 行有用信息,反而看不到重点 —— 所以只列有内容的,</p>
+ */
+const reviewActionable = computed(() => (review.value?.items ?? []).filter(hasSubstance))
+const reviewQuietCount = computed(() => (review.value?.items?.length ?? 0) - reviewActionable.value.length)
+
+/** 采纳计数(抽屉底部展示"已采纳 x/y",让"还没保存"这件事可核对) */
+const adoptedCount = computed(() => Object.values(adopted.value).filter(Boolean).length)
+
 /** 丢弃草稿:回到空白新建态(只清内容字段,不动题型与上下架选择) */
 function onDiscardDraft(): void {
   draftInfo.value = null
@@ -922,5 +1117,98 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+/* ===== AI 校核建议抽屉(阶段 A10) ===== */
+.rv__summary {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.rv__counts {
+  margin: 0 0 12px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.rv__dropped {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--lc-warning-text, #a06a00);
+}
+
+.rv__empty {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.rv__item {
+  border: 1px solid var(--lc-border, rgba(128, 128, 128, 0.24));
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.rv__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rv__orphan {
+  font-size: 12px;
+  color: var(--lc-error, #d03050);
+}
+
+.rv__note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+
+.rv__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.rv__row--expl {
+  display: block;
+}
+
+.rv__label {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-right: 4px;
+}
+
+.rv__text {
+  margin: 4px 0 6px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.rv__hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  opacity: 0.72;
+}
+
+.rv__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rv__count {
+  font-size: 12px;
+  opacity: 0.8;
 }
 </style>

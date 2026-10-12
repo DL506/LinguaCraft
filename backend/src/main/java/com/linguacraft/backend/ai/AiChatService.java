@@ -43,13 +43,31 @@ public class AiChatService {
     }
 
     /**
-     * 单轮对话(带超时控制)。
+     * 单轮对话(使用默认超时)。
      *
      * @param prompt 提示词
      * @return 模型返回文本
      * @throws BizException 超时或调用失败(code 500)
      */
     public String chat(String prompt) {
+        return chat(prompt, timeoutSeconds);
+    }
+
+    /**
+     * 单轮对话(自定义应用层等待上限)。
+     *
+     * <p>为什么需要这一层:AI 调用受<b>两层</b> 60 秒限制——HTTP 客户端的
+     * {@code spring.ai.openai.chat.options.timeout},以及这里的 Future 等待。
+     * 实测校核一道 10 空的题要 60~90 秒,只放宽前一层没用(仍会在本层 60 秒处报"响应超时"),
+     * 只放宽后一层也没用(会变成 {@code OpenAIInvalidDataException: Error reading response})。
+     * 两层都要放宽,且只对需要的调用放宽,出题/判分的 60 秒口径不变。</p>
+     *
+     * @param prompt         提示词
+     * @param timeoutSeconds 本次调用的等待上限秒数
+     * @return 模型返回文本
+     * @throws BizException 超时或调用失败(code 500)
+     */
+    public String chat(String prompt, long timeoutSeconds) {
         try {
             CompletableFuture<String> future = CompletableFuture.supplyAsync(() ->
                     chatClient.prompt().user(prompt).call().content());
@@ -66,14 +84,26 @@ public class AiChatService {
     }
 
     /**
-     * 单轮对话并解析 JSON(自动剥离代码块围栏与多余文字)。
+     * 单轮对话并解析 JSON(自动剥离代码块围栏与多余文字,使用默认超时)。
      *
      * @param prompt 提示词(要求模型只输出 JSON)
      * @return JSON 节点
      * @throws BizException 调用失败或返回非法 JSON(code 500)
      */
     public JsonNode chatForJson(String prompt) {
-        String text = chat(prompt);
+        return chatForJson(prompt, timeoutSeconds);
+    }
+
+    /**
+     * 单轮对话并解析 JSON(自定义应用层等待上限)。
+     *
+     * @param prompt         提示词
+     * @param timeoutSeconds 本次调用的等待上限秒数
+     * @return JSON 节点
+     * @throws BizException 调用失败或返回非法 JSON(code 500)
+     */
+    public JsonNode chatForJson(String prompt, long timeoutSeconds) {
+        String text = chat(prompt, timeoutSeconds);
         String json = PromptTemplates.extractJson(text);
         try {
             return objectMapper.readTree(json);

@@ -1,10 +1,13 @@
 package com.linguacraft.backend.controller;
 
 import com.linguacraft.backend.ai.AiGenerateService;
+import com.linguacraft.backend.ai.AiReviewService;
 import com.linguacraft.backend.common.PageResult;
 import com.linguacraft.backend.common.R;
 import com.linguacraft.backend.dto.admin.AiDraftDto;
 import com.linguacraft.backend.dto.admin.AiDraftRequest;
+import com.linguacraft.backend.dto.admin.AiReviewDto;
+import com.linguacraft.backend.dto.admin.AiReviewRequest;
 import com.linguacraft.backend.dto.admin.QuestionAdminDetailDto;
 import com.linguacraft.backend.dto.admin.QuestionAdminListItemDto;
 import com.linguacraft.backend.dto.admin.QuestionUpsertRequest;
@@ -44,9 +47,15 @@ public class AdminQuestionController {
     /** AI 草稿入口(阶段 A9):生成与闸门在 AiGenerateService,本控制器只负责鉴权命名空间与响应包装 */
     private final AiGenerateService aiGenerateService;
 
-    public AdminQuestionController(AdminQuestionService adminQuestionService, AiGenerateService aiGenerateService) {
+    /** AI 校核入口(阶段 A10):建议生成与清洗在 AiReviewService,同样不写库 */
+    private final AiReviewService aiReviewService;
+
+    public AdminQuestionController(AdminQuestionService adminQuestionService,
+                                   AiGenerateService aiGenerateService,
+                                   AiReviewService aiReviewService) {
         this.adminQuestionService = adminQuestionService;
         this.aiGenerateService = aiGenerateService;
+        this.aiReviewService = aiReviewService;
     }
 
     /**
@@ -113,6 +122,20 @@ public class AdminQuestionController {
     @PostMapping("/ai-draft")
     public R<AiDraftDto> aiDraft(@Valid @RequestBody AiDraftRequest request) {
         return R.ok(aiGenerateService.generateDraft(request.getType()));
+    }
+
+    /**
+     * AI 校核当前题目(只给建议,不入库)。
+     *
+     * @param request 题型 + 当前 content + 当前 answer_key(表单此刻的内容,允许尚未保存)
+     * @return 统一响应:data 为逐编号的建议清单
+     */
+    @Operation(summary = "AI 校核当前题目(不落库)", description = "阶段 A10:对表单当前的题面与答案给出三类建议 —— 语法填空的可接受写法、解析与答案是否一致、标准答案是否可疑。收整份内容而非题目 id,所以新建与 AI 草稿在保存前就能校核;本接口不读库也不写库,建议由管理员逐项采纳后才写入表单,仍需点保存才落库。答案风险只作提醒,服务端与前端都不会自动改答案")
+    @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功返回建议,code=1004 题型非法,code=400 缺答案项(写作题应改用 AI 预评),code=500 AI 不可用/超时")
+    @ApiResponse(responseCode = "403", description = "非管理员令牌:code=403 无权限访问")
+    @PostMapping("/ai-review")
+    public R<AiReviewDto> aiReview(@Valid @RequestBody AiReviewRequest request) {
+        return R.ok(aiReviewService.review(request.getType(), request.getContent(), request.getAnswerKey()));
     }
 
     /**
