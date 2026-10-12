@@ -11,7 +11,7 @@
 
 ## 后端快速开始(详细见 backend/README.md)
 
-1. 启动本地 MySQL 8.4.7(程序目录 `C:\Users\ASUS\mysql-8.4.7-winx64`,进 `bin` 执行 `.\mysqld.exe --console`;Windows 服务 `MySQL` 默认未启用);
+1. 启动本地 MySQL 8.4.7(程序与数据都在 `C:\Users\ASUS\mysql-8.4.7-winx64`,进 `bin` 执行 `.\mysqld.exe --defaults-file=C:/Users/ASUS/mysql-8.4.7-winx64/my.ini --console`;Windows 服务 `MySQL` 默认未启用且其路径指向旧的 D 盘位置,不要用它。起后用 `SELECT @@datadir;` 确认为 `C:\Users\ASUS\mysql-8.4.7-winx64\Data\`);
 2. 按顺序执行建库与种子脚本(全量清单与命令见 `backend/src/main/resources/db/README.md`);
 3. 启动后端:`cd backend` → `.\mvnw.cmd spring-boot:run`(端口 8080;Swagger UI `/swagger-ui.html`);
 4. 账号:学生端 `demo / 123456`;后台管理端 `admin / 123456`(登录后访问 `/admin`,仅管理员可进入;`/api/admin/**` 后端同时做 403 校验)。

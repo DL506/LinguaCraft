@@ -4,7 +4,7 @@
 
 - JDK 21
 - 本地 MySQL 8.4.7(默认连接 `127.0.0.1:3306/linguacraft`,`root`;可用环境变量覆盖)
-  - 程序目录 `C:\Users\ASUS\mysql-8.4.7-winx64`;其 `my.ini` 的 `basedir`/`datadir` 仍指向 `D:\GraduationProject\mysql-8.4.7-winx64`,因此**数据目录(含 linguacraft 库)在 D 盘**
+  - 程序目录 `C:\Users\ASUS\mysql-8.4.7-winx64`;其 `my.ini` 的 `basedir`/`datadir` 指向**同盘的 `C:\Users\ASUS\mysql-8.4.7-winx64\Data`,因此数据目录(含 linguacraft 库)在 C 盘**(2026-10-12 从 D 盘整目录搬迁而来;D 盘那份快照与 C 盘迁移前旧快照均保留未删,回退只需对调 `my.ini` 里的注释段)。启动须带 `--defaults-file=C:/Users/ASUS/mysql-8.4.7-winx64/my.ini`,起后用 `SELECT @@datadir;` 自证;Windows 服务 `MySQL` 的 PathName 仍指向 D 盘 exe,**不要用它启动**
   - Windows 服务 `MySQL` 为 Stopped/Disabled,进 `bin` 直接拉起即可:`.\mysqld.exe --console`
 - 使用仓库自带 Maven wrapper(`mvnw.cmd`),无需单独安装 Maven
 

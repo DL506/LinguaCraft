@@ -26,7 +26,7 @@
 
 ## 通用前置
 
-- 本地 MySQL 8.4.7 已启动。程序目录 `C:\Users\ASUS\mysql-8.4.7-winx64`(其 my.ini 的 basedir/datadir 仍指向 D 盘,数据在 D 盘);Windows 服务 `MySQL` 为 Stopped/Disabled,启动方式:进 `bin` 执行 `.\mysqld.exe --console`。
+- 本地 MySQL 8.4.7 已启动。程序与数据都在 `C:\Users\ASUS\mysql-8.4.7-winx64`(datadir = 该目录下的 `Data`,2026-10-12 从 D 盘搬迁;D 盘快照与 C 盘迁移前旧快照均保留未删);Windows 服务 `MySQL` 为 Stopped/Disabled 且 PathName 指向 D 盘 exe,**不要用它启动**。手动启动:`cd bin` → `.\mysqld.exe --defaults-file=C:/Users/ASUS/mysql-8.4.7-winx64/my.ini --console`,起完用 `SELECT @@datadir, @@port;` 自证读到了哪份数据。
 - 后端启动:`cd backend` → `.\mvnw.cmd spring-boot:run`(端口 8080)。
 - AI 与密钥的本地注入:`backend/.env.local`(不入库,样例见 `backend/.env.example`)填 `LC_AI_API_KEY`/`LC_AI_BASE_URL`/`LC_AI_MODEL` 后,
   启动前需导出为环境变量(Git Bash:`set -a && . ./.env.local && set +a`);未注入时应用仍会启动,但日志逐项 WARN 并让 AI 接口走降级。
