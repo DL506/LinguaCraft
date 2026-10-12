@@ -8,11 +8,33 @@
       <h2 class="qedit__title">{{ isEdit ? `编辑题目 · ${form.id}` : '新建题目' }}</h2>
       <n-space size="small">
         <n-button size="small" @click="router.push('/admin/questions')">返回列表</n-button>
+        <n-tooltip v-if="!isEdit" trigger="hover">
+          <template #trigger>
+            <n-button size="small" type="info" ghost :loading="generating" :disabled="generating" @click="onGenerateDraft">
+              AI 生成一版
+            </n-button>
+          </template>
+          让 AI 出一道新题的草稿填进下面的表单。草稿<b>不入库</b>：改完点「创建题目」才落库、才对学生可见。
+        </n-tooltip>
         <n-button size="small" type="primary" :loading="saving" @click="onSave">
           {{ isEdit ? '保存修改' : '创建题目' }}
         </n-button>
       </n-space>
     </div>
+
+    <n-alert v-if="generating" type="info" :show-icon="false" class="qedit__notice">
+      AI 正在出题，通常 10~40 秒，最长约 2 分钟（超时或结构不合格会自动重试一次）。这期间可以继续，但请先别点保存。
+    </n-alert>
+
+    <n-alert v-else-if="draftInfo" type="success" :show-icon="false" class="qedit__notice">
+      <div class="qedit__draftbar">
+        <span>
+          已填入 AI 草稿（模型 <code>{{ draftInfo.model }}</code>{{ formatDraftTime(draftInfo.generatedAt) ? ' · ' + formatDraftTime(draftInfo.generatedAt) : '' }}），
+          <b>尚未保存</b>。来源已记为 AI；改成真题/模拟题也可以，点「创建题目」才入库上架。
+        </span>
+        <n-button size="tiny" quaternary type="error" @click="onDiscardDraft">丢弃草稿</n-button>
+      </div>
+    </n-alert>
 
     <n-alert v-if="manualJson" type="warning" :show-icon="false" class="qedit__notice">
       你已在「高级」面板里手工编辑 JSON —— 本次提交以该面板为准，上方表单的改动不会再自动同步进去。
@@ -193,10 +215,12 @@ import {
   NSpace,
   NSelect,
   NTag,
+  NTooltip,
   useMessage,
 } from 'naive-ui'
 import {
   createAdminQuestion,
+  generateAdminAiDraft,
   getAdminQuestion,
   updateAdminQuestion,
 } from '@/api/admin'
@@ -247,6 +271,12 @@ const hydrating = ref(false)
 /** 服务端拒绝保存时留下的原文与命中的表单行下标(内联展示,不只在 toast 里一闪而过) */
 const saveError = ref<string | null>(null)
 const errorRowIndex = ref<number | null>(null)
+
+/** AI 草稿状态(阶段 A9):生成中标志 + 已填入草稿的来源信息,用于提示"这是草稿、还没入库" */
+const generating = ref(false)
+const draftInfo = ref<{ model: string; generatedAt: string } | null>(null)
+/** 草稿带来的来源 meta(模型名与生成时刻),保存时随 sourceType=ai 原样带回 */
+const draftSourceMeta = ref<Record<string, unknown> | null>(null)
 
 const form = reactive({
   id: '',
@@ -509,20 +539,21 @@ function syncFromForm(): void {
   manualJson.value = false
 }
 
-/** 编辑模式:详情反填表单与 JSON(反填期间不让 watcher 重生成面板,见 A8 的覆盖 bug) */
-async function loadForEdit(id: string): Promise<void> {
-  const detail = await getAdminQuestion(id)
+/**
+ * 把一份 content / answer_key 灌进表单与高级面板。
+ *
+ * <p>编辑反填与 AI 草稿填入<b>共用这一条路径</b>,两者只是数据来源不同:
+ * 反填来自库里的详情(含 id/type/source 等权威键),草稿来自模型(不含权威键)。
+ * 灌完后面板显示的就是"此刻会提交的内容",表单保持权威(A8)。</p>
+ *
+ * <p>期间用 `hydrating` 挡住 watcher:表单被逐字段赋值会排进本次 flush 队列,
+ * 等 `nextTick()` 之后再放开,否则面板会被 watcher 用表单结果重写(就是 A8 修掉的那个覆盖 bug)。</p>
+ */
+async function hydrateFrom(
+  content: Record<string, unknown>,
+  answerKey: Record<string, unknown>
+): Promise<void> {
   hydrating.value = true
-  form.id = detail.id
-  form.type = detail.type
-  form.sourceType = detail.sourceType
-  form.title = detail.title ?? ''
-  form.difficulty = detail.difficulty ?? 3
-  form.status = detail.status ?? 1
-  form.tagsText = (detail.tags ?? []).join(',')
-
-  const content = (detail.content ?? {}) as Record<string, unknown>
-  const answerKey = (detail.answerKey ?? {}) as Record<string, unknown>
   // 留存原始对象:保存时以此打底,表单表达不出来的键才能被原样带回
   originalContent.value = content
   originalAnswerKey.value = answerKey
@@ -558,9 +589,83 @@ async function loadForEdit(id: string): Promise<void> {
   contentJson.value = JSON.stringify(content, null, 2)
   answerKeyJson.value = JSON.stringify(answerKey, null, 2)
   manualJson.value = false
-  // 反填造成的表单变动会被排进本次 flush 队列,等它跑完再放开同步,否则面板会被表单重写成与库里不一致
   await nextTick()
   hydrating.value = false
+}
+
+/** 编辑模式:GET 详情 → 基本信息 + 反填 */
+async function loadForEdit(id: string): Promise<void> {
+  const detail = await getAdminQuestion(id)
+  form.id = detail.id
+  form.type = detail.type
+  form.sourceType = detail.sourceType
+  form.title = detail.title ?? ''
+  form.difficulty = detail.difficulty ?? 3
+  form.status = detail.status ?? 1
+  form.tagsText = (detail.tags ?? []).join(',')
+  await hydrateFrom((detail.content ?? {}) as Record<string, unknown>,
+    (detail.answerKey ?? {}) as Record<string, unknown>)
+}
+
+/**
+ * AI 生成一版草稿(阶段 A9):POST /admin/questions/ai-draft → 灌进表单。
+ *
+ * <p>三条硬约束:① 草稿只填表单,不写 JSON 面板(面板只是提交内容预览);
+ * ② <b>不落库、不上架</b>,要点「创建题目」才入库(与学生端"点即生成即上架"是两条不同路径);
+ * ③ 只在新建模式提供 —— 编辑已有题时整题替换会覆盖人工内容并丢历史对应关系,不给这个按钮。</p>
+ */
+async function onGenerateDraft(): Promise<void> {
+  generating.value = true
+  saveError.value = null
+  errorRowIndex.value = null
+  try {
+    const draft = await generateAdminAiDraft(form.type)
+    // 题型以服务端返回为准(留空兜底,正常应与请求一致)
+    form.type = draft.type ?? form.type
+    if (draft.title) form.title = draft.title
+    if (draft.difficulty) form.difficulty = draft.difficulty
+    if (draft.tags?.length) form.tagsText = draft.tags.join(',')
+    // 来源如实标为 AI,并把模型名与生成时刻存下来,保存时随 sourceType=ai 一起带回
+    form.sourceType = 'ai'
+    draftSourceMeta.value = (draft.sourceMeta as Record<string, unknown>) ?? null
+    draftInfo.value = {
+      model: String(draft.sourceMeta?.model ?? '未知模型'),
+      generatedAt: String(draft.sourceMeta?.generatedAt ?? ''),
+    }
+    await hydrateFrom((draft.content ?? {}) as Record<string, unknown>,
+      (draft.answerKey ?? {}) as Record<string, unknown>)
+    message.success('AI 草稿已填入表单,尚未保存 —— 改完点「创建题目」才入库')
+  } catch (error) {
+    saveError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    generating.value = false
+  }
+}
+
+/** 草稿生成时刻显示成"月-日 时:分"(服务端给的是 ISO 串,拿不到就留空,不猜) */
+function formatDraftTime(raw: string): string {
+  if (!raw) return ''
+  const matched = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(raw)
+  return matched ? `${matched[2]}-${matched[3]} ${matched[4]}:${matched[5]}` : ''
+}
+
+/** 丢弃草稿:回到空白新建态(只清内容字段,不动题型与上下架选择) */
+function onDiscardDraft(): void {
+  draftInfo.value = null
+  draftSourceMeta.value = null
+  // 一并清掉"passthrough 打底"的原始对象,否则丢弃草稿后仍会把草稿里的键带回下一次提交
+  originalContent.value = {}
+  originalAnswerKey.value = {}
+  form.title = ''
+  form.tagsText = ''
+  form.passage = ''
+  form.prompt = ''
+  form.requirementsText = ''
+  form.sampleAnswer = ''
+  form.optionsText = ''
+  form.rows = [newRow()]
+  syncFromForm()
+  message.info('已丢弃 AI 草稿')
 }
 
 /** 保存前本地预检:答案键是否误填进 content、占位符与行号是否一致 */
@@ -635,6 +740,8 @@ async function onSave(): Promise<void> {
     tags: splitList(form.tagsText),
     content,
     answerKey,
+    // AI 草稿带来的来源信息只在来源仍为 ai 时带回;改成真题/模拟题后由服务端按原口径覆写
+    sourceMeta: form.sourceType === 'ai' ? (draftSourceMeta.value ?? undefined) : undefined,
   }
 
   saving.value = true
@@ -806,5 +913,14 @@ onMounted(async () => {
 
 .qedit__error strong {
   font-weight: 600;
+}
+
+/* AI 草稿提示条:文案与「丢弃草稿」按钮同行,窄屏自动换行 */
+.qedit__draftbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 </style>

@@ -4,6 +4,7 @@
 import { del, get, patch, post, put, upload } from './request'
 import type {
   AdminPing,
+  AdminAiDraft,
   AdminDashboard,
   AdminExamSubmissionDetail,
   AdminExamPaper,
@@ -190,6 +191,15 @@ export function getAdminQuestion(id: string): Promise<AdminQuestionDetail> {
 /** 新建题目(服务端会做五道结构校验,失败返回 code 400 与定位路径) */
 export function createAdminQuestion(payload: AdminQuestionPayload): Promise<AdminQuestionDetail> {
   return post<AdminQuestionDetail>('/admin/questions', payload)
+}
+
+/**
+ * AI 生成题目草稿(阶段 A9):服务端过完五道闸门后返回草稿,**不入库、不上架**。
+ * 落库仍由管理员改完表单后点「创建题目」触发。
+ * 失败口径:code=500 且 message 以「AI 出题结果不合格:」开头(模型产出结构缺陷,已自动重试过一次)。
+ */
+export function generateAdminAiDraft(type: string): Promise<AdminAiDraft> {
+  return post<AdminAiDraft>('/admin/questions/ai-draft', { type })
 }
 
 /** 更新题目(整条覆盖 content 与 answer_key;题型不可变) */

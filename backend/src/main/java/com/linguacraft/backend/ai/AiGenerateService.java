@@ -6,6 +6,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 import com.linguacraft.backend.common.BizException;
 import com.linguacraft.backend.common.ResultCode;
+import com.linguacraft.backend.dto.admin.AiDraftDto;
 import com.linguacraft.backend.dto.practice.PracticeItemResponse;
 import com.linguacraft.backend.dto.practice.SourceDto;
 import com.linguacraft.backend.entity.Question;
@@ -28,6 +29,11 @@ import java.util.List;
  * <p>流程:调用模型 → 字段结构校验 → 拆分"下发内容 / 答案"双 JSON → 五道入库校验(与后台题目录入
  * 共用 {@link QuestionContentValidator})→ 持久化到题库(source=ai,题目可被详情/提交/错题重做全链路复用)
  * → 返回 ForAnswer。任一步不合格都<b>不落库</b>,带原因重试一次,仍失败则返回可重试错误。</p>
+ *
+ * <p>两个出口共用上面这条链路,区别只在最后一步:
+ * {@link #generate(String)} 是学生端"点即生成",生成即落库且默认上架;
+ * {@link #generateDraft(String)} 是后台录入页的"AI 生成一版"(阶段 A9),<b>只返草稿不写库</b>,
+ * 落库与上架由管理员点保存触发。写 {@code question} 内容的 AI 一律要过人,这是本项目定的边界。</p>
  */
 @Service
 public class AiGenerateService {
@@ -80,6 +86,38 @@ public class AiGenerateService {
         Question question = buildAndPersist(type, callWithRetry(type));
         log.info("AI 出题完成: id={} type={} title={}", question.getId(), type, question.getTitle());
         return toResponse(question);
+    }
+
+    /**
+     * 只生成草稿,不落库(阶段 A9,后台录入页「AI 生成一版」)。
+     *
+     * <p>与学生端 {@link #generate(String)} 的关系:共用同一条「调用模型 → 浅层结构校验 →
+     * 拆分双 JSON → 五道闸门」链路和同样的重试次数,唯一区别是<b>到此为止不写库</b>。
+     * 因此草稿与已入库题目经过的是同一个质量闸门,不存在"AI 草稿可以绕过校验"的口子。</p>
+     *
+     * <p>返回的 content 不含 {@code id/type/source}:这三个字段由服务端在保存时按最终题型与来源覆写,
+     * 草稿阶段编一个 id 只会误导管理员去改一个马上会被覆盖的值。</p>
+     *
+     * @param type 题型(五种之一)
+     * @return 已通过闸门校验的草稿
+     * @throws BizException 题型非法(1004)或生成/校验失败(code 500,文案以「AI 出题结果不合格:」开头)
+     */
+    public AiDraftDto generateDraft(String type) {
+        if (!PracticeRules.isValidType(type)) {
+            throw new BizException(ResultCode.TYPE_INVALID);
+        }
+        Draft draft = callWithRetry(type);
+        JsonNode json = draft.raw();
+        log.info("AI 草稿已生成(未入库): type={} title={}", type, json.path("title").asText(""));
+        return AiDraftDto.builder()
+                .type(type)
+                .title(resolveTitle(json, type))
+                .difficulty(resolveDifficulty(json))
+                .tags(collectTags(json))
+                .content(draft.content())
+                .answerKey(draft.answerKey())
+                .sourceMeta(buildAiMeta())
+                .build();
     }
 
     /**
@@ -219,14 +257,9 @@ public class AiGenerateService {
         JsonNode json = draft.raw();
         String questionId = type + "-ai-" + Long.toString(System.currentTimeMillis(), 36);
 
-        // source 节点:{type:"ai", meta:{model, generatedAt}}
-        ObjectNode source = objectMapper.createObjectNode();
-        source.put("type", "ai");
-        ObjectNode meta = source.putObject("meta");
-        meta.put("model", modelName);
-        meta.put("generatedAt", LocalDateTime.now().toString());
-
         ObjectNode content = draft.content();
+        // source 只建一次,content 与 source_meta 复用同一个节点 —— 两处必须同源,否则学生端看到的来源与后台记录会分叉
+        ObjectNode source = buildAiSource();
         content.put("id", questionId);
         content.put("type", type);
         content.set("source", source);
@@ -236,13 +269,8 @@ public class AiGenerateService {
         question.setType(type);
         question.setSourceType("ai");
         question.setSourceMeta(source.toString());
-        String title = json.path("title").asText("");
-        question.setTitle(title.isBlank()
-                ? "AI出题·" + PracticeRules.typeName(type) + " · "
-                        + LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM-dd HH:mm"))
-                : title);
-        int difficulty = json.path("difficulty").asInt(3);
-        question.setDifficulty(Math.max(1, Math.min(5, difficulty)));
+        question.setTitle(resolveTitle(json, type));
+        question.setDifficulty(resolveDifficulty(json));
         question.setTags(buildTagsJson(json));
         question.setContent(content.toString());
         question.setAnswerKey(draft.answerKey().toString());
@@ -252,6 +280,60 @@ public class AiGenerateService {
         question.setStatus(1);
         questionMapper.insert(question);
         return question;
+    }
+
+    /**
+     * AI 来源的 meta 子对象 {@code {model, generatedAt}}。
+     *
+     * <p>草稿接口返回的就是这一层(而不是外层带 {@code type} 的完整 source),
+     * 与题目详情 {@code AdminQuestionDetailDto.sourceMeta} 和录入请求
+     * {@code QuestionUpsertRequest.sourceMeta} 同形 —— 前端拿到什么就能原样回填什么,
+     * 不需要自己剥一层。</p>
+     *
+     * @return meta 节点
+     */
+    private ObjectNode buildAiMeta() {
+        ObjectNode meta = objectMapper.createObjectNode();
+        meta.put("model", modelName);
+        meta.put("generatedAt", LocalDateTime.now().toString());
+        return meta;
+    }
+
+    /**
+     * 来源节点 {@code {type:"ai", meta:{model, generatedAt}}}(生成即记录,与草稿返回同构)。
+     *
+     * @return 新建的 source 节点(调用方按需 deepCopy 后使用)
+     */
+    private ObjectNode buildAiSource() {
+        ObjectNode source = objectMapper.createObjectNode();
+        source.put("type", "ai");
+        source.set("meta", buildAiMeta());
+        return source;
+    }
+
+    /**
+     * 标题:AI 给了就用,否则按题型与时间兜底(与录入服务的"留空自动生成"同口径)。
+     *
+     * @param json AI 返回
+     * @param type 题型
+     * @return 标题
+     */
+    private String resolveTitle(JsonNode json, String type) {
+        String title = json.path("title").asText("");
+        return title.isBlank()
+                ? "AI出题·" + PracticeRules.typeName(type) + " · "
+                        + LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM-dd HH:mm"))
+                : title;
+    }
+
+    /**
+     * 难度:夹到 1~5。
+     *
+     * @param json AI 返回
+     * @return 难度
+     */
+    private int resolveDifficulty(JsonNode json) {
+        return Math.max(1, Math.min(5, json.path("difficulty").asInt(3)));
     }
 
     /**
@@ -370,12 +452,12 @@ public class AiGenerateService {
     }
 
     /**
-     * 标签 JSON:取 AI 返回 tags(字符串数组),缺省为 ["AI出题"]。
+     * 标签列表:取 AI 返回 tags(字符串数组,剔除空白项),缺省为 ["AI出题"]。
      *
      * @param json AI 返回
-     * @return 标签 JSON 字符串
+     * @return 标签列表(永不为空)
      */
-    private String buildTagsJson(JsonNode json) {
+    private List<String> collectTags(JsonNode json) {
         List<String> tags = new ArrayList<>();
         if (json.has("tags") && json.get("tags").isArray()) {
             for (JsonNode tag : json.get("tags")) {
@@ -388,8 +470,18 @@ public class AiGenerateService {
         if (tags.isEmpty()) {
             tags.add("AI出题");
         }
+        return tags;
+    }
+
+    /**
+     * 标签 JSON:取 AI 返回 tags(字符串数组),缺省为 ["AI出题"]。
+     *
+     * @param json AI 返回
+     * @return 标签 JSON 字符串
+     */
+    private String buildTagsJson(JsonNode json) {
         try {
-            return objectMapper.writeValueAsString(tags);
+            return objectMapper.writeValueAsString(collectTags(json));
         } catch (Exception e) {
             return "[\"AI出题\"]";
         }

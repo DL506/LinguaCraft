@@ -1,7 +1,10 @@
 package com.linguacraft.backend.controller;
 
+import com.linguacraft.backend.ai.AiGenerateService;
 import com.linguacraft.backend.common.PageResult;
 import com.linguacraft.backend.common.R;
+import com.linguacraft.backend.dto.admin.AiDraftDto;
+import com.linguacraft.backend.dto.admin.AiDraftRequest;
 import com.linguacraft.backend.dto.admin.QuestionAdminDetailDto;
 import com.linguacraft.backend.dto.admin.QuestionAdminListItemDto;
 import com.linguacraft.backend.dto.admin.QuestionUpsertRequest;
@@ -38,8 +41,12 @@ public class AdminQuestionController {
 
     private final AdminQuestionService adminQuestionService;
 
-    public AdminQuestionController(AdminQuestionService adminQuestionService) {
+    /** AI 草稿入口(阶段 A9):生成与闸门在 AiGenerateService,本控制器只负责鉴权命名空间与响应包装 */
+    private final AiGenerateService aiGenerateService;
+
+    public AdminQuestionController(AdminQuestionService adminQuestionService, AiGenerateService aiGenerateService) {
         this.adminQuestionService = adminQuestionService;
+        this.aiGenerateService = aiGenerateService;
     }
 
     /**
@@ -92,6 +99,20 @@ public class AdminQuestionController {
     @PostMapping
     public R<QuestionAdminDetailDto> create(@Valid @RequestBody QuestionUpsertRequest request) {
         return R.ok(adminQuestionService.create(request));
+    }
+
+    /**
+     * AI 生成题目草稿(不入库)。
+     *
+     * @param request 只含题型
+     * @return 统一响应:data 为过完五道闸门的草稿(content/answerKey/title/difficulty/tags/sourceMeta)
+     */
+    @Operation(summary = "AI 生成题目草稿(不落库)", description = "阶段 A9:调用模型出题并跑与人工录入同一套五道闸门,通过后只返回草稿;不写 question 表、不上架。管理员在录入表单里改完点「创建题目」才入库。模型产出结构不合格时重试一次,仍失败返回 code=500 且文案以「AI 出题结果不合格:」开头(带定位路径)")
+    @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功返回草稿,code=1004 题型非法,code=500 AI 不可用/超时/产出反复不过闸门")
+    @ApiResponse(responseCode = "403", description = "非管理员令牌:code=403 无权限访问")
+    @PostMapping("/ai-draft")
+    public R<AiDraftDto> aiDraft(@Valid @RequestBody AiDraftRequest request) {
+        return R.ok(aiGenerateService.generateDraft(request.getType()));
     }
 
     /**

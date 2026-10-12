@@ -67,6 +67,21 @@ export interface AdminQuestionPayload {
   answerKey?: Record<string, unknown>
 }
 
+/** AI 题目草稿(POST /api/admin/questions/ai-draft,阶段 A9;服务端已过五道闸门但未入库) */
+export interface AdminAiDraft {
+  type: PracticeType
+  /** AI 标题(服务端保证非空:缺失时按题型+时间兜底) */
+  title?: string
+  difficulty?: number
+  tags?: string[]
+  /** 下发内容(不含答案,也**不含** id/type/source —— 这三个由保存时服务端覆写) */
+  content: Record<string, unknown>
+  /** 答案与解析 */
+  answerKey?: Record<string, unknown>
+  /** 来源 meta:{type:'ai', meta:{model, generatedAt}} */
+  sourceMeta?: Record<string, unknown>
+}
+
 /** 管理端批改队列列表项(GET /api/admin/submissions) */
 export interface AdminSubmissionListItem {
   id: number
