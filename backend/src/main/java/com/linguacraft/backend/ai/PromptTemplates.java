@@ -185,6 +185,47 @@ public final class PromptTemplates {
     }
 
     /**
+     * 真题卷某部分「补写中文解析」提示词(阶段 A11,整卷解析生成)。
+     *
+     * <p>与单题校核(A10)的分工不同:这里标准答案已由管理员定死,模型<b>只解释为什么是这个答案</b>,
+     * 所以提示词明令禁止改答案、禁止新增编号;服务端仍会再清洗一遍,不指望模型兑现。</p>
+     *
+     * @param type       本部分题型
+     * @param content    本部分卷面 JSON(含文章与选项,不含答案)
+     * @param batchItems 本批答案项(含标准答案与可能为空的已有解析)
+     * @param batchIds   本批答题卡编号
+     * @return 提示词
+     */
+    public static String examExplainPrompt(String type, JsonNode content, JsonNode batchItems, List<Integer> batchIds) {
+        return """
+                你是广东专插本公共英语的真题解析撰写老师。下面是真题卷的某一个部分,
+                每题的标准答案都由管理员定好了,你的唯一任务是为每题写一条中文解析,说清为什么是这个答案。
+                不要改写题目,不要更换答案,不要讨论"答案是否可能有误"。
+                题型:""" + type + """
+
+                本批只处理这些答题卡编号:""" + batchIds + """
+                (卷面是完整的,但其中不属于上述编号的题目由别的批次负责,本批一律不写、也不要提到它们。)
+
+                本部分卷面 content(JSON,不含答案):
+                """ + (content == null ? "{}" : content.toString()) + """
+
+                本批答案项(JSON:id 为答题卡编号,answer 为标准答案,explanation 为已有解析,可能为空):
+                """ + (batchItems == null ? "[]" : batchItems.toString()) + """
+
+                输出 JSON 结构:
+                {"items":[{"id":21,"explanation":"中文解析"}]}
+
+                硬性要求:
+                - items 必须恰好覆盖本批编号,一个不多一个不少;id 原样照抄,不得新增、不得合并;
+                - 解析要贴着原文说依据:指出文章里的关键词或句子片段,说明它如何唯一推出该答案;
+                  选项题用一句话交代为什么选它、其余项为何不成立;语法填空点明考查点与形式依据;
+                - 已有 explanation 且没有明显问题的,把它写得更清楚即可,不要改变它的结论;
+                - 每条解析不超过 120 字,用中文,不要整句英文,不要出现"根据要求""作为 AI"这类话;
+                - 绝对不要输出 answer 字段(答案不由你决定),也不要输出这个 JSON 以外的任何文字或代码块围栏。"""
+                + JSON_ONLY;
+    }
+
+    /**
      * 从 AI 返回文本中提取 JSON 主干(容错:剥离代码块围栏与多余文字)。
      *
      * @param text AI 返回文本

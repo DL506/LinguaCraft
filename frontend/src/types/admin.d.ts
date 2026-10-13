@@ -107,6 +107,38 @@ export interface AdminAiReview {
   droppedCount?: number
 }
 
+/** 管理端真题卷「AI 补本部分解析」请求(POST /api/admin/exam-papers/ai-explain,阶段 A11) */
+export interface ExamExplainPayload {
+  /** 本部分题型(写作被服务端拒绝) */
+  type: PracticeType
+  /** 本部分卷面(表单此刻的内容,与保存时同形) */
+  content: unknown
+  /** 本部分答案项 [{id(答题卡编号),answer,explanation?}] */
+  items: unknown
+}
+
+/** 真题卷单卡号解析建议 */
+export interface AdminExamExplainItem {
+  /** 答题卡编号(与表单行的卡号对应) */
+  id: number
+  /** 建议的中文解析(服务端已去空白并截断超长) */
+  explanation: string
+}
+
+/** 真题卷「AI 补解析」结果(建议清单,未写库) */
+export interface AdminExamExplain {
+  type: PracticeType
+  items?: AdminExamExplainItem[]
+  /** 送去处理的答案项数(已排除没有标准答案的) */
+  requestedCount?: number
+  /** 因缺标准答案被跳过的项数 */
+  skippedNoAnswer?: number
+  /** 被服务端丢弃的条数(卡号不属于本部分或解析为空) */
+  droppedCount?: number
+  /** 实际调用模型的批数(每批 ≤5 项) */
+  batchCount?: number
+}
+
 /** 管理端批改队列列表项(GET /api/admin/submissions) */
 export interface AdminSubmissionListItem {
   id: number

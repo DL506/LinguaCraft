@@ -7,6 +7,7 @@ import type {
   AdminAiDraft,
   AdminAiReview,
   AdminDashboard,
+  AdminExamExplain,
   AdminExamSubmissionDetail,
   AdminExamPaper,
   AdminExamSubmissionListItem,
@@ -21,6 +22,7 @@ import type {
   AdminUserListItem,
   AdminVocabBook,
   AdminWord,
+  ExamExplainPayload,
   ExamPaperPayload,
   ExamWritingGradePayload,
   GrammarNodePayload,
@@ -319,6 +321,11 @@ export function createAdminExamPaper(payload: ExamPaperPayload): Promise<AdminEx
 /** 整卷更新 */
 export function updateAdminExamPaper(id: string, payload: ExamPaperPayload): Promise<AdminExamPaper> {
   return put<AdminExamPaper>(`/admin/exam-papers/${encodeURIComponent(id)}`, payload)
+}
+
+/** AI 为某个部分补写中文解析(POST,不读库不写库;按 5 题一批,一个部分约 1~3 次模型调用) */
+export function explainExamPaperSection(payload: ExamExplainPayload): Promise<AdminExamExplain> {
+  return post<AdminExamExplain>('/admin/exam-papers/ai-explain', payload)
 }
 
 /** 上架/下架(下架只停止新作答,历史成绩报告仍可读) */

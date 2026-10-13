@@ -2,7 +2,10 @@ package com.linguacraft.backend.controller;
 
 import com.linguacraft.backend.common.PageResult;
 import com.linguacraft.backend.common.R;
+import com.linguacraft.backend.ai.AiExamExplainService;
 import com.linguacraft.backend.dto.admin.AdminExamPaperDto;
+import com.linguacraft.backend.dto.admin.ExamExplainDto;
+import com.linguacraft.backend.dto.admin.ExamExplainRequest;
 import com.linguacraft.backend.dto.admin.ExamPaperUpsertRequest;
 import com.linguacraft.backend.service.AdminExamPaperService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 管理端真题卷接口(阶段 A6-③):整卷维护、上下架、引用保护删除。
+ * 管理端真题卷接口(阶段 A6-③):整卷维护、上下架、引用保护删除;A11 增「AI 补本部分解析」。
  *
  * <p>详情会下发 {@code answer_key},因此与学生端的 {@code /api/exam/**} 严格分 namespace。</p>
  */
@@ -33,8 +36,12 @@ public class AdminExamPaperController {
 
     private final AdminExamPaperService adminExamPaperService;
 
-    public AdminExamPaperController(AdminExamPaperService adminExamPaperService) {
+    private final AiExamExplainService aiExamExplainService;
+
+    public AdminExamPaperController(AdminExamPaperService adminExamPaperService,
+                                   AiExamExplainService aiExamExplainService) {
         this.adminExamPaperService = adminExamPaperService;
+        this.aiExamExplainService = aiExamExplainService;
     }
 
     /**
@@ -101,6 +108,20 @@ public class AdminExamPaperController {
             @Parameter(description = "试卷 ID", required = true) @PathVariable("id") String id,
             @Valid @RequestBody ExamPaperUpsertRequest request) {
         return R.ok(adminExamPaperService.save(id, request));
+    }
+
+    /**
+     * AI 为某个部分补写中文解析(阶段 A11)。
+     *
+     * @param request 本部分题型 + 卷面 + 答案项
+     * @return 统一响应:data 为解析建议清单(未写库)
+     */
+    @Operation(summary = "AI 补本部分解析",
+            description = "收表单此刻的某个部分(不是试卷 id),分批调模型只产中文解析;不读库不写库,采纳进表单后仍需点「校验并保存」才生效")
+    @ApiResponse(responseCode = "200", description = "统一响应;code=0 成功,code=400 本部分无可处理答案项,code=1004 题型非法,code=500 AI 不可用")
+    @PostMapping("/ai-explain")
+    public R<ExamExplainDto> aiExplain(@Valid @RequestBody ExamExplainRequest request) {
+        return R.ok(aiExamExplainService.explain(request.getType(), request.getContent(), request.getItems()));
     }
 
     /**

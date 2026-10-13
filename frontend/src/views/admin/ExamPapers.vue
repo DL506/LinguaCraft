@@ -93,7 +93,7 @@
             </ul>
           </div>
 
-          <n-tabs v-model:value="activeTab" type="card" size="small" class="papers__tabs">
+          <n-tabs v-model:value="activeTab" type="card" size="small" class="papers__tabs" @update:value="clearExplain">
             <n-tab-pane v-for="section in sections" :key="section.uid" :name="String(section.uid)">
               <template #tab>
                 <span class="papers__tab">
@@ -259,6 +259,34 @@
                   <n-button size="tiny" @click="addRows(section, 1)">加一题</n-button>
                   <n-button v-if="section.type === 'reading'" size="tiny" @click="addPassage(section)">加一篇</n-button>
                 </div>
+
+                <!-- AI 补本部分解析(阶段 A11):只产中文解析,采纳进表单仍需保存 -->
+                <div class="papers__ai">
+                  <n-button size="small" tertiary type="primary" :loading="explaining" @click="onExplainSection(section)">
+                    AI 补本部分解析
+                  </n-button>
+                  <span class="papers__ai-hint">
+                    按答题卡编号分批(每批 5 题),一个部分约 1~3 次调用、15~90 秒;不改任何标准答案。
+                  </span>
+                </div>
+                <div v-if="explaining || explainEntries.length" class="papers__ai-panel">
+                  <p class="papers__ai-meta">{{ explainMeta }}</p>
+                  <div v-for="entry in explainEntries" :key="entry.card" class="papers__ai-row">
+                    <n-tag size="tiny" type="info" :bordered="false">卡号 {{ entry.card }}</n-tag>
+                    <div class="papers__ai-text">
+                      <p class="papers__ai-current">现有:{{ entry.current || '(暂无解析)' }}</p>
+                      <p class="papers__ai-suggest">建议:{{ entry.suggestion }}</p>
+                    </div>
+                    <n-button size="tiny" tertiary type="primary" :disabled="entry.adopted" @click="adoptExplanation(entry)">
+                      {{ entry.adopted ? '已采纳' : '采纳' }}
+                    </n-button>
+                  </div>
+                  <div class="papers__ai-actions">
+                    <n-button size="tiny" @click="adoptBlankOnly">只填空白解析</n-button>
+                    <n-button size="tiny" text @click="clearExplain">收起</n-button>
+                    <span class="papers__ai-hint">采纳只写进表单,仍需点「校验并保存」才对学生生效</span>
+                  </div>
+                </div>
               </template>
             </n-tab-pane>
           </n-tabs>
@@ -313,6 +341,7 @@ import {
 import {
   createAdminExamPaper,
   deleteAdminExamPaper,
+  explainExamPaperSection,
   getAdminExamPaper,
   getAdminExamPapers,
   setAdminExamPaperStatus,
@@ -920,6 +949,95 @@ const previewText = computed(() => {
   }
 })
 
+/** 一条解析建议对应表单里的哪一行(直接持有行对象,采纳即写回该行) */
+interface ExplainEntry {
+  card: number
+  row: ItemRow
+  current: string
+  suggestion: string
+  adopted: boolean
+}
+
+const explaining = ref(false)
+const explainEntries = ref<ExplainEntry[]>([])
+const explainMeta = ref('')
+
+function clearExplain(): void {
+  explainEntries.value = []
+  explainMeta.value = ''
+}
+
+/**
+ * 让 AI 给本部分补中文解析。
+ *
+ * <p>送出去的是 `buildPayloads()` 的产物,和点保存时提交的形状一模一样 ——
+ * 避免出现"AI 看着表单、管理员存的却是另一份"。服务端不读库也不写库。</p>
+ */
+async function onExplainSection(section: SectionModel): Promise<void> {
+  const built = buildPayloads()
+  const contentSection = asArray(built.content.sections).find((one) => Number(one.part) === section.part)
+  const keySection = asArray(built.answerKey.sections).find((one) => Number(one.part) === section.part)
+  const items = asArray(keySection?.items)
+  if (!items.length) {
+    message.warning('本部分还没有题目或答案')
+    return
+  }
+  explaining.value = true
+  clearExplain()
+  try {
+    const res = await explainExamPaperSection({
+      type: section.type,
+      content: contentSection?.content ?? null,
+      items,
+    })
+    const byCard = new Map<number, string>()
+    for (const one of res.items ?? []) byCard.set(one.id, one.explanation)
+    explainEntries.value = sectionRows(section)
+      .map((row) => {
+        const card = numberOf(row).card
+        return { card, row, current: row.explanation, suggestion: byCard.get(card) ?? '', adopted: false }
+      })
+      .filter((entry) => entry.suggestion !== '')
+    const skipped = res.skippedNoAnswer ?? 0
+    const dropped = res.droppedCount ?? 0
+    const quiet = (res.requestedCount ?? 0) - explainEntries.value.length
+    explainMeta.value =
+      `${explainEntries.value.length} 题给出建议 · ${res.batchCount ?? 0} 批` +
+      (quiet > 0 ? ` · 另有 ${quiet} 题模型未给可用解析` : '') +
+      (skipped > 0 ? ` · ${skipped} 题没有标准答案已跳过(先补答案)` : '') +
+      (dropped > 0 ? ` · 丢弃 ${dropped} 条对不上本部分卡号的返回` : '')
+    if (!explainEntries.value.length) {
+      message.info('模型这次没有给出可用解析')
+    }
+  } catch {
+    /* AI 不可用/超时等由 request 层统一提示 */
+  } finally {
+    explaining.value = false
+  }
+}
+
+/** 采纳单条(覆盖该行现有解析) */
+function adoptExplanation(entry: ExplainEntry): void {
+  entry.row.explanation = entry.suggestion
+  entry.current = entry.suggestion
+  entry.adopted = true
+}
+
+/** 批量只填"当前没有解析"的行:已有解析的必须逐条点,免得把人工写的好解析冲掉 */
+function adoptBlankOnly(): void {
+  let filled = 0
+  for (const entry of explainEntries.value) {
+    if (entry.adopted || entry.row.explanation.trim()) {
+      continue
+    }
+    entry.row.explanation = entry.suggestion
+    entry.current = entry.suggestion
+    entry.adopted = true
+    filled++
+  }
+  message.success(filled ? `已填入 ${filled} 条解析,仍需点「校验并保存」` : '没有空白解析的行(已有解析的请逐条采纳)')
+}
+
 async function fetchList(): Promise<void> {
   loading.value = true
   try {
@@ -1089,6 +1207,7 @@ function hydrate(content: Record<string, unknown> | null, answerKey: Record<stri
 async function openEditor(id: string | null): Promise<void> {
   editorShow.value = true
   editorLoading.value = true
+  clearExplain()
   try {
     if (id) {
       const detail = await getAdminExamPaper(id)
@@ -1370,6 +1489,67 @@ onMounted(fetchList)
   display: flex;
   gap: 8px;
   margin-top: 10px;
+}
+
+.papers__ai {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--lc-border, rgba(0, 0, 0, 0.08));
+}
+
+.papers__ai-hint {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.papers__ai-panel {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--lc-radius-md);
+  background-color: var(--lc-bg-soft, rgba(0, 0, 0, 0.03));
+}
+
+.papers__ai-meta {
+  margin: 0 0 6px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.papers__ai-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--lc-border, rgba(0, 0, 0, 0.06));
+}
+
+.papers__ai-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.papers__ai-current,
+.papers__ai-suggest {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.papers__ai-current {
+  opacity: 0.65;
+}
+
+.papers__ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .papers__add {
