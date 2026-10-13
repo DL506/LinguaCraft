@@ -13,13 +13,18 @@ import type {
   WritingQuestionFull,
 } from './practice'
 
-/** 阅读部分内容(契约调整):整卷阅读为 3 篇,每篇 5 题,题号全局连续 1-15 */
+/** 阅读部分内容(契约调整):整卷阅读为 3 篇,每篇 5 题,题序 1-15 连续(阅读是第一部分,故与卡号重合) */
 export type ReadingPaperContent = ReadingQuestionForAnswer[]
 
 /** 阅读部分完整内容(仅 mock 层存储) */
 export type ReadingPaperContentFull = ReadingQuestionFull[]
 
-/** 整卷结构(下发版:content 为不含答案的下发类型) */
+/**
+ * 整卷结构(下发版:content 为不含答案的下发类型)
+ *
+ * 编号口径(任务书 11.7):`content` 里每题的 `id` 是**本节内题序**(1~n),
+ * 答题卡全局编号 = 前序各部分题量累加 + 题序,由 `ExamPaper.vue` 与后台编辑器各自按数据推导。
+ */
 export interface ExamPaper {
   id: string
   /** 年份 */
@@ -81,7 +86,7 @@ export interface ExamListItem {
 /** 整卷交卷请求(12.4) */
 export interface ExamSubmitRequest {
   /**
-   * 客观题作答:key 为答题卡全局编号(1~45,见任务书 11.7 编号映射规则),
+   * 客观题作答:key 为答题卡全局编号(1~客观题总数,见任务书 11.7 编号映射规则),
    * value 为选项 key(五选五)或填空文本(语法填空)
    */
   objective: Record<number, string>

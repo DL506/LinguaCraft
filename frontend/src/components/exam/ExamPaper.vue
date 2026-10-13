@@ -1,5 +1,6 @@
 <!-- 整卷答题(任务书 10.12):顶部 5 个部分跳转,中间答题区,底部答题卡
-     答题卡全局编号规则(11.7):阅读 1-15、匹配 16-20、完形 21-35、语法 36-45、作文单独
+     答题卡编号规则(任务书 11.7):全局编号 = 前序各部分题量累加 + 本节题序,
+     偏移量按 paper.sections 实时推导(不再写死 15/20/35/45),与后端 ExamPaperValidator 同一口径
      作答统一以全局编号存储;各部分复用对应题型的组件渲染 -->
 <template>
   <div class="exam-paper">
@@ -20,7 +21,7 @@
 
     <!-- 答题区:按当前部分渲染 -->
     <div class="exam-paper__body">
-      <!-- 阅读部分:3 篇,每篇 5 题(题号全局连续 1-15);布局与 practice/reading 一致——桌面左文章右题目 -->
+      <!-- 阅读部分:3 篇,每篇 5 题(卷面存本节题序,答题卡按前序累加换算) -->
       <template v-if="readingPapers">
         <div v-for="paperItem in readingPapers" :key="paperItem.id" class="exam-paper__reading-paper">
           <div class="exam-paper__passage">
@@ -36,15 +37,15 @@
               v-for="q in paperItem.questions"
               :key="q.id"
               :question="q"
-              :model-value="objective[q.id] ?? ''"
+              :model-value="objective[readingOffset + q.id] ?? ''"
               :graded="false"
-              @update:model-value="onPick(q.id, $event)"
+              @update:model-value="onPick(readingOffset + q.id, $event)"
             />
           </div>
         </div>
       </template>
 
-      <!-- 五选五部分:选项池 + 文章槽位(全局编号 16-20,文章占位保持局部编号展示) -->
+      <!-- 五选五部分:选项池 + 文章槽位(答题卡编号 = matchingOffset + 局部题号,文章占位保持局部编号展示) -->
       <template v-else-if="activeSection?.type === 'matching' && matchingContent">
         <OptionPool
           :options="matchingContent.options"
@@ -58,7 +59,7 @@
             <BlankSlot
               v-else
               :id="seg.id ?? 0"
-              :answer-key="objective[15 + (seg.id ?? 0)]"
+              :answer-key="objective[matchingOffset + (seg.id ?? 0)]"
               :active="activeBlankId === seg.id"
               :graded="false"
               @click="onBlankClick(seg.id ?? 0)"
@@ -68,7 +69,7 @@
         </div>
       </template>
 
-      <!-- 完形填空部分:文章 + 单题(全局编号 21-35) -->
+      <!-- 完形填空部分:文章 + 单题(答题卡编号 = clozeOffset + 局部题号) -->
       <template v-else-if="activeSection?.type === 'cloze' && clozeContent">
         <div class="exam-paper__passage">
           <ClozePassage
@@ -86,15 +87,15 @@
             :id="blank.id"
             :key="blank.id"
             :options="blank.options"
-            :model-value="objective[20 + blank.id] ?? ''"
+            :model-value="objective[clozeOffset + blank.id] ?? ''"
             :graded="false"
             :active="activeLocalBlankId === blank.id"
-            @update:model-value="onPick(20 + blank.id, $event)"
+            @update:model-value="onPick(clozeOffset + blank.id, $event)"
           />
         </div>
       </template>
 
-      <!-- 语法填空部分:文章 + 填空(全局编号 36-45) -->
+      <!-- 语法填空部分:文章 + 填空(答题卡编号 = grammarOffset + 局部题号) -->
       <template v-else-if="activeSection?.type === 'grammar-fill' && grammarFillContent">
         <div class="exam-paper__passage">
           <FillPassage
@@ -112,10 +113,10 @@
             :id="blank.id"
             :key="blank.id"
             :hint="blank.hint"
-            :model-value="objective[35 + blank.id] ?? ''"
+            :model-value="objective[grammarOffset + blank.id] ?? ''"
             :graded="false"
             :active="activeLocalBlankId === blank.id"
-            @update:model-value="onPick(35 + blank.id, $event)"
+            @update:model-value="onPick(grammarOffset + blank.id, $event)"
           />
         </div>
       </template>
@@ -134,9 +135,9 @@
       </template>
     </div>
 
-    <!-- 底部答题卡:1-45 全局编号,点击跳到对应部分(10.12) -->
+    <!-- 底部答题卡:1~客观题总数 全局编号,点击跳到对应部分(10.12) -->
     <div class="exam-paper__sheet">
-      <AnswerSheet :count="45" :answers="objective" :details="[]" @select="onSheetSelect" />
+      <AnswerSheet :count="totalObjectiveCount" :answers="objective" :details="[]" @select="onSheetSelect" />
       <n-button size="small" :type="activePart === 5 ? 'primary' : 'default'" ghost @click="activePart = 5">
         作文(单独)
       </n-button>
@@ -153,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-// 作答存储:objective(全局编号 1-45 → 选项 key/填空文本)+ writing(作文正文)
+// 作答存储:objective(答题卡全局编号 → 选项 key/填空文本)+ writing(作文正文)
 // 对外通过 getPayload() 暴露交卷数据(父页面在交卷时调用)
 import { computed, ref, watch } from 'vue'
 import { NButton, useMessage } from 'naive-ui'
@@ -180,7 +181,7 @@ import type {
   ReadingQuestionForAnswer,
   WritingQuestionForAnswer,
 } from '@/types/practice'
-import type { ExamPaper } from '@/types/exam'
+import type { ExamPaper, ExamSection } from '@/types/exam'
 
 const props = defineProps<{
   /** 整卷(下发版,不含答案) */
@@ -233,20 +234,76 @@ const writingContent = computed(() =>
   activeSection.value?.type === 'writing' ? (sectionContent.value as WritingQuestionForAnswer) : null
 )
 
-/** 五选五文章片段与已用选项 */
-const matchingSegments = computed(() => (matchingContent.value ? parsePassage(matchingContent.value.passage) : []))
-const usedMatchingKeys = computed(() =>
-  Object.entries(objective.value)
-    .filter(([k]) => Number(k) >= 16 && Number(k) <= 20)
-    .map(([, v]) => v)
+/** 一个部分在答题卡上的编号区间 */
+type PartNumbering = { offset: number; count: number; from: number; to: number }
+
+/** 某部分客观题题量(阅读为各篇 questions 合计;写作不占答题卡) */
+function countItems(section: ExamSection): number {
+  if (section.type === 'writing') {
+    return 0
+  }
+  const content = section.content
+  if (section.type === 'reading' && Array.isArray(content)) {
+    return content.reduce((sum, p) => sum + p.questions.length, 0)
+  }
+  if (Array.isArray(content)) {
+    return 0
+  }
+  if (content.type === 'matching') return content.blanks.length
+  if (content.type === 'cloze') return content.blanks.length
+  if (content.type === 'grammar-fill') return content.blanks.length
+  return 0
+}
+
+/**
+ * 答题卡编号映射(任务书 11.7):按 part 升序累加前序题量。
+ *
+ * <p>卷面存的是本节内题序(1~n),答题卡与交卷 objective 的 key 都是全局编号;
+ * 偏移量必须由数据推导,否则后台一旦增删题目,学生端就会静默串题。</p>
+ */
+const numberings = computed<Record<number, PartNumbering>>(() => {
+  const map: Record<number, PartNumbering> = {}
+  let offset = 0
+  for (const section of [...props.paper.sections].sort((a, b) => a.part - b.part)) {
+    const count = countItems(section)
+    map[section.part] = { offset, count, from: offset + 1, to: offset + count }
+    offset += count
+  }
+  return map
+})
+
+/** 某题型部分的编号区间(卷内该题型至多一个部分,缺失即空区间) */
+function numberingOf(type: PracticeType): PartNumbering {
+  const section = props.paper.sections.find((s) => s.type === type)
+  return (section && numberings.value[section.part]) || { offset: 0, count: 0, from: 1, to: 0 }
+}
+
+/** 各部分的答题卡起始偏移 */
+const readingOffset = computed(() => numberingOf('reading').offset)
+const matchingOffset = computed(() => numberingOf('matching').offset)
+const clozeOffset = computed(() => numberingOf('cloze').offset)
+const grammarOffset = computed(() => numberingOf('grammar-fill').offset)
+
+/** 客观题总数(答题卡格数) */
+const totalObjectiveCount = computed(() =>
+  Object.values(numberings.value).reduce((max, n) => Math.max(max, n.to), 0)
 )
 
+/** 五选五文章片段与已用选项 */
+const matchingSegments = computed(() => (matchingContent.value ? parsePassage(matchingContent.value.passage) : []))
+const usedMatchingKeys = computed(() => {
+  const range = numberingOf('matching')
+  return Object.entries(objective.value)
+    .filter(([k]) => Number(k) >= range.from && Number(k) <= range.to)
+    .map(([, v]) => v)
+})
+
 /** 完形/语法填空:把全局作答映射为局部编号(文章组件按局部 [[n]] 查询) */
-const clozeAnswersLocal = computed(() =>
-  Object.fromEntries(Object.entries(objective.value).map(([k, v]) => [Number(k) - 20, v])) as Record<number, string>
+const clozeAnswersLocal = computed<Record<number, string>>(() =>
+  Object.fromEntries(Object.entries(objective.value).map(([k, v]) => [Number(k) - clozeOffset.value, v]))
 )
-const grammarFillAnswersLocal = computed(() =>
-  Object.fromEntries(Object.entries(objective.value).map(([k, v]) => [Number(k) - 35, v])) as Record<number, string>
+const grammarFillAnswersLocal = computed<Record<number, string>>(() =>
+  Object.fromEntries(Object.entries(objective.value).map(([k, v]) => [Number(k) - grammarOffset.value, v]))
 )
 
 /** 部分名称 */
@@ -261,34 +318,20 @@ function partName(type: PracticeType): string {
   return map[type]
 }
 
-/** 某部分题量(作文不计数;阅读为 3 篇题数合计) */
+/** 某部分题量(答题卡口径,作文为 0) */
 function countInPart(part: number): number {
-  const section = props.paper.sections.find((s) => s.part === part)
-  if (!section) return 0
-  const content = section.content
-  if (section.type === 'reading' && Array.isArray(content)) {
-    return content.reduce((sum, p) => sum + p.questions.length, 0)
-  }
-  if (Array.isArray(content)) return 0
-  if (content.type === 'matching') return content.blanks.length
-  if (content.type === 'cloze') return content.blanks.length
-  if (content.type === 'grammar-fill') return content.blanks.length
-  return 0
+  return numberings.value[part]?.count ?? 0
 }
 
 /** 某部分已答数 */
 function answeredInPart(part: number): number {
-  const base: Record<number, [number, number]> = {
-    1: [1, 15],
-    2: [16, 20],
-    3: [21, 35],
-    4: [36, 45],
+  const range = numberings.value[part]
+  if (!range) {
+    return 0
   }
-  const range = base[part]
-  if (!range) return 0
   return Object.entries(objective.value).filter(([k, v]) => {
     const n = Number(k)
-    return n >= range[0] && n <= range[1] && v !== ''
+    return n >= range.from && n <= range.to && v !== ''
   }).length
 }
 
@@ -299,7 +342,7 @@ function onPick(id: number, value: string): void {
 
 /** 五选五:点空位(10.8:已填移除;有选中选项填入;手机弹面板) */
 function onBlankClick(localId: number): void {
-  const globalId = 15 + localId
+  const globalId = matchingOffset.value + localId
   if (objective.value[globalId]) {
     onBlankRemove(localId)
     return
@@ -317,7 +360,7 @@ function onBlankClick(localId: number): void {
 function onOptionClick(key: string): void {
   if (usedMatchingKeys.value.includes(key)) return
   if (activeBlankId.value !== null) {
-    onPick(15 + activeBlankId.value, key)
+    onPick(matchingOffset.value + activeBlankId.value, key)
     activeBlankId.value = null
     return
   }
@@ -327,7 +370,7 @@ function onOptionClick(key: string): void {
 /** 五选五:手机面板选择 */
 function onPickerPick(key: string): void {
   if (activeBlankId.value !== null) {
-    onPick(15 + activeBlankId.value, key)
+    onPick(matchingOffset.value + activeBlankId.value, key)
   }
   activeBlankId.value = null
   activeOptionKey.value = null
@@ -336,16 +379,21 @@ function onPickerPick(key: string): void {
 /** 五选五:移除已填 */
 function onBlankRemove(localId: number): void {
   const next = { ...objective.value }
-  delete next[15 + localId]
+  delete next[matchingOffset.value + localId]
   objective.value = next
 }
 
-/** 答题卡点击:跳到对应部分(10.12) */
+/** 答题卡点击:跳到对应部分(10.12;区间由数据推导) */
 function onSheetSelect(globalId: number): void {
-  if (globalId <= 15) activePart.value = 1
-  else if (globalId <= 20) activePart.value = 2
-  else if (globalId <= 35) activePart.value = 3
-  else activePart.value = 4
+  const hit = [...props.paper.sections]
+    .sort((a, b) => a.part - b.part)
+    .find((section) => {
+      const range = numberings.value[section.part]
+      return !!range && range.count > 0 && globalId >= range.from && globalId <= range.to
+    })
+  if (hit) {
+    activePart.value = hit.part
+  }
 }
 
 /** 模考阅读中收藏选中句子(与其他题型一致) */
@@ -369,7 +417,7 @@ function getPayload(): { objective: Record<number, string>; writing?: { content:
 /** 未作答客观题数量(交卷确认用) */
 function unansweredCount(): number {
   let count = 0
-  for (let id = 1; id <= 45; id++) {
+  for (let id = 1; id <= totalObjectiveCount.value; id++) {
     if (!objective.value[id]) count++
   }
   return count

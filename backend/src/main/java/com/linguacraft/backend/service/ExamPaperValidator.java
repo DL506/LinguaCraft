@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -23,8 +23,9 @@ import java.util.Set;
  * <ol>
  *   <li>结构:每个 section 必须有 {@code part}(全卷唯一)、{@code type}、{@code score}(正数);</li>
  *   <li>分值:{@code sum(section.score)} 必须等于 {@code exam_paper.total_score};</li>
- *   <li>题号:非写作部分的答案 {@code items[].id} 集合必须与该部分卷面题号集合<b>完全相等</b>,
- *       且全卷不重复(卷面里三篇阅读的题号是 1-5/6-10/11-15 连续编号,与答案同一套);</li>
+ *   <li>题号(任务书 11.7 编号映射规则):卷面每部分的 {@code id} 是<b>该部分内的局部题序</b>,
+ *       必须恰为 1..n;答案 {@code items[].id} 是<b>答题卡全局编号</b>,按 part 升序累加前序部分题量,
+ *       必须恰为 offset+1..offset+n(种子卷即 1-15/16-20/21-35/36-45)。</li>
  *   <li>写作:有且仅有一个 {@code type=writing} 的部分,分值必须为 15
  *       (异步批改器按 15 分封顶,不一致会让 AI 分数与人工分数口径分叉)。</li>
  * </ol>
@@ -48,7 +49,7 @@ public class ExamPaperValidator {
         JsonNode keySections = sectionsOf(answerKey, "answer_key");
 
         Set<Integer> parts = new HashSet<>();
-        Set<Integer> allAnswerIds = new HashSet<>();
+        List<PartNumbers> objectiveParts = new ArrayList<>();
         BigDecimal sum = BigDecimal.ZERO;
         int writingSections = 0;
 
@@ -75,22 +76,13 @@ public class ExamPaperValidator {
                         && !section.path("content").path("scoringDimensions").isEmpty(),
                         "第 " + part + " 部分缺少评分维度 scoringDimensions");
             } else {
-                List<Integer> contentIds = paperIdsOf(section.path("content"), part);
-                JsonNode keySection = findKeySection(keySections, part);
-                List<Integer> keyIds = answerIdsOf(keySection, part);
-                if (!new LinkedHashSet<>(contentIds).equals(new LinkedHashSet<>(keyIds))) {
-                    throw new BizException(ResultCode.PARAM_ERROR.getCode(),
-                            "第 " + part + " 部分的答案编号与题目编号不一致(题目:" + contentIds + ",答案:" + keyIds
-                                    + ");客观题按编号配对,不一致会静默判错");
-                }
-                for (Integer id : keyIds) {
-                    if (!allAnswerIds.add(id)) {
-                        throw new BizException(ResultCode.PARAM_ERROR.getCode(),
-                                "答题卡编号 " + id + " 在全卷重复出现,判分会串题");
-                    }
-                }
+                objectiveParts.add(new PartNumbers(part, type,
+                        paperIdsOf(section.path("content"), part),
+                        answerIdsOf(findKeySection(keySections, part), part)));
             }
         }
+
+        validateNumbering(objectiveParts);
 
         // 答案里多出来的部分同样要拦(否则某部分永远判不到答案)
         for (JsonNode keySection : keySections) {
@@ -117,6 +109,62 @@ public class ExamPaperValidator {
                     "各部分分值之和 " + sum.stripTrailingZeros().toPlainString() + " 与卷面总分 "
                             + totalScore.stripTrailingZeros().toPlainString() + " 不一致");
         }
+    }
+
+    /**
+     * 按任务书 11.7 的编号映射规则校验客观题编号。
+     *
+     * <p>卷面存<b>本节内局部题序</b>(1~n),答案存<b>答题卡全局编号</b>(前序部分题量累加 + 局部题序)。
+     * 偏移量必须按 part 升序整卷累加:任何一部分增删题目都会让后续部分整体位移,
+     * 而前端换算与后端判分都只认编号,所以这里按序重算并逐段比对。</p>
+     *
+     * @param objectiveParts 各客观题部分的编号对照
+     */
+    private void validateNumbering(List<PartNumbers> objectiveParts) {
+        List<PartNumbers> ordered = new ArrayList<>(objectiveParts);
+        ordered.sort(Comparator.comparingInt(PartNumbers::part));
+        int offset = 0;
+        for (PartNumbers numbers : ordered) {
+            int count = numbers.contentIds().size();
+            if (!new HashSet<>(numbers.contentIds()).equals(range(1, count))) {
+                throw new BizException(ResultCode.PARAM_ERROR.getCode(),
+                        "第 " + numbers.part + " 部分(" + numbers.type + ")的卷面题号必须是本节内连续的 1~" + count
+                                + ",当前为 " + numbers.contentIds() + ";答题卡编号按「前序累加 + 卷面题号」换算,不连续会串题");
+            }
+            if (!new HashSet<>(numbers.keyIds()).equals(range(offset + 1, count))) {
+                throw new BizException(ResultCode.PARAM_ERROR.getCode(),
+                        "第 " + numbers.part + " 部分(" + numbers.type + ")的答案编号必须是答题卡全局编号 "
+                                + (offset + 1) + "~" + (offset + count) + "(前序共 " + offset + " 题),当前为 "
+                                + numbers.keyIds() + ";客观题按编号配对,不一致会静默判错");
+            }
+            offset += count;
+        }
+    }
+
+    /**
+     * 连续编号集合 {from, ..., from+count-1}。
+     *
+     * @param from  起始编号
+     * @param count 个数
+     * @return 编号集合
+     */
+    private Set<Integer> range(int from, int count) {
+        Set<Integer> ids = new HashSet<>();
+        for (int i = 0; i < count; i++) {
+            ids.add(from + i);
+        }
+        return ids;
+    }
+
+    /**
+     * 单个客观题部分的编号对照(卷面局部题序 vs 答案全局编号)。
+     *
+     * @param part       部分号
+     * @param type       题型
+     * @param contentIds 卷面题号(本节内局部)
+     * @param keyIds     答案编号(答题卡全局)
+     */
+    private record PartNumbers(int part, String type, List<Integer> contentIds, List<Integer> keyIds) {
     }
 
     /**
