@@ -3,6 +3,7 @@ package com.linguacraft.backend.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -49,6 +50,23 @@ public class RuntimeSafetyReporter {
         for (String name : missing) {
             String impact = name.startsWith("LC_AI_") ? AI_IMPACT : "正在使用 application.yml 内置默认值";
             log.warn("环境变量 {} 未设置 —— {};对外环境必须显式注入(样例见 backend/.env.example)", name, impact);
+        }
+    }
+
+    /**
+     * 前端产物自检:这份包里到底有没有带 dist。
+     *
+     * <p>同一份产物有两种用法:{@code java -jar} 时页面靠包内 {@code static/index.html};
+     * 交给 nginx 时页面根本不该由后端出。部署出问题时先看这一行,不用猜哪份前端在生效。</p>
+     *
+     * @param event 应用就绪事件(仅用于触发时机)
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void reportFrontendBundle(ApplicationReadyEvent event) {
+        if (new ClassPathResource("static/index.html").exists()) {
+            log.info("前端产物:已内置(classpath:static/index.html)—— 根路径可直接打开页面");
+        } else {
+            log.info("前端产物:未内置 —— 本进程只出接口,页面需由 nginx 或外部 dist 提供");
         }
     }
 }

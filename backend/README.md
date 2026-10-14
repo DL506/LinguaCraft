@@ -37,6 +37,18 @@ cd backend
 .\mvnw.cmd spring-boot:run      # 端口 8080
 ```
 
+## 打包
+
+产物是**可执行 war**(内置前端 dist):既能 `java -jar target/linguacraft.war` 直接起(自带页面),也能部署进外部 Tomcat 11。
+
+```powershell
+cd frontend; npm run build                    # 先出 frontend/dist
+cd ..\backend; .\mvnw.cmd clean package       # → backend/target/linguacraft.war
+```
+
+外部 Tomcat 场景务必部署成 `ROOT`(前端 `/api` 前缀是硬编码的),且容器必须是 **11.0.x + JDK 21+**。
+细节、nginx 配置要点和这次改动的原因见 [docs/打包与部署.md](docs/打包与部署.md)。
+
 - Swagger UI:`http://localhost:8080/swagger-ui.html`
 - 健康检查:`http://localhost:8080/actuator/health`
 - 演示账号:`demo / 123456`(S01 种子;**重复执行 S01 会把 demo 重置为初始状态**)

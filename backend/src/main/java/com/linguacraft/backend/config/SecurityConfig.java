@@ -1,5 +1,6 @@
 package com.linguacraft.backend.config;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -20,12 +21,16 @@ import java.util.List;
 /**
  * Spring Security 配置:无状态 JWT 认证 + 单角色授权。
  *
- * <p>放行范围:/api/auth/**(登录注册等)、/api/system/**(冒烟)、swagger 与 actuator;
- * 其余接口必须携带有效 Bearer 令牌,未认证统一返回 HTTP 401 + code 401。</p>
+ * <p>授权面就是 <b>/api/**</b>:其中 /api/auth/**(登录注册等)与 /api/system/**(冒烟)放行,
+ * /api/admin/** 额外要求管理员,其余 /api/** 必须携带有效 Bearer 令牌,未认证统一返回 HTTP 401 + code 401。
+ * <b>非 /api 的请求一律放行</b> —— war 里带着前端 dist,首页与前端路由(如 /admin/exam-papers 的直接访问或刷新)
+ * 属于静态资源与 SPA 页面,不放行会让 {@code java -jar} 一打开就是 401。</p>
  *
  * <p>后台权限:/api/admin/** 除认证外还要求 {@code hasRole("ADMIN")}(角色由 JWT 声明经
  * {@link JwtAuthFilter} 转为 ROLE_ADMIN);已登录但角色不足时由
  * {@link RestAccessDeniedHandler} 统一返回 HTTP 403 + code 403。</p>
+ *
+ * <p>注意:前端页面路径放行不等于数据放行 —— 页面拿不到任何业务数据,数据只在 /api 后面。</p>
  */
 @Configuration
 @EnableWebSecurity
@@ -60,9 +65,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/api/system/**",
                                 "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
                                 "/actuator/**").permitAll()
-                        // 后台接口:必须为管理员角色(匹配顺序必须在 anyRequest 之前)
+                        // 后台接口:必须为管理员角色(顺序必须在 /api/** 兜底之前)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
+                        // 业务接口一律要登录:全部控制器都在 /api 下(16 个 @RequestMapping 实测无例外)
+                        .requestMatchers("/api/**").authenticated()
+                        // 非 /api 的其余请求是 war 自带的前端静态资源与 SPA 页面路由,不含业务数据,必须放行:
+                        // 放行前 "/";/assets/* 全部 401,java -jar 打开首页就是白屏
+                        .dispatcherTypeMatchers(DispatcherType.FORWARD).permitAll()
+                        .anyRequest().permitAll())
                 .exceptionHandling(handler -> handler
                         .authenticationEntryPoint(restAuthEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler))

@@ -11,6 +11,8 @@
 	<groupId>com.linguacraft</groupId>
 	<artifactId>backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	<!-- war:同一个产物既能 java -jar(内嵌 Tomcat,自带前端 dist)直接起,也能丢进外部 Tomcat 11 -->
+	<packaging>war</packaging>
 	<name>backend</name>
 	<description/>
 	<url/>
@@ -31,6 +33,8 @@
 		<spring-ai.version>2.0.1</spring-ai.version>
 		<!-- springdoc 3.1.0 内部使用 swagger-core-jakarta 2.2.52,注解包必须对齐 -->
 		<swagger.version>2.2.52</swagger.version>
+		<!-- 前端构建产物目录:存在则打进 war 的 WEB-INF/classes/static(缺失只跳过,不报错) -->
+		<frontend.dist>${project.basedir}/../frontend/dist</frontend.dist>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -97,6 +101,15 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
+		<!--
+		  内嵌容器改为 provided:java -jar 时由 WarLauncher 从 WEB-INF/lib-provided 加载,
+		  部署到外部 Tomcat 时该目录被容器忽略,避免与本仓库 webmvc starter 传递进来的容器重复。
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+			<scope>provided</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -156,10 +169,38 @@
 	</dependencies>
 
 	<build>
+		<!-- 产物名固定为 linguacraft.war:外部 Tomcat 部署时按需要重命名成 ROOT.war(前端 /api 前缀是硬编码的) -->
+		<finalName>linguacraft</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+				<executions>
+					<execution>
+						<!--
+						  把前端产物落到 classes/static(即 war 的 WEB-INF/classes/static),
+						  刻意不拷进 src/main/resources:那会往源码树里写几 MB 产物,git status 变脏且 mvn clean 删不掉。
+						-->
+						<id>copy-frontend-dist</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
+							<resources>
+								<resource>
+									<directory>${frontend.dist}</directory>
+									<filtering>false</filtering>
+								</resource>
+							</resources>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
